@@ -1,0 +1,35 @@
+:root {
+	/* Light theme variables */
+	--background: #f4f4f4;
+	--surface: #ffffff;
+	--text: #102a43;
+	--muted: #475569;
+	--accent: #3b82f6;
+	--success: #16a34a;
+	--success-contrast: #064e3b;
+	--warning: #f59e0b;
+	--warning-contrast: #92400e;
+	--danger: #ef4444;
+	--danger-contrast: #7f1d1d;
+	--scrollbar-track: #f1f5f9;
+	--scrollbar-thumb: #cbd5e1;
+	--scrollbar-thumb-hover: #94a3b8;
+}
+
+/* Dark theme variables applied via the `.dark` class on documentElement */
+.dark {
+	--background: #020617;
+	--surface: #0b1220;
+	--text: #e2e8f0;
+	--muted: #94a3b8;
+	--accent: #60a5fa;
+	--success: #22c55e;
+	--success-contrast: #0f5132;
+	--warning: #fbbf24;
+	--warning-contrast: #7c2d12;
+	--danger: #f87171;
+	--danger-contrast: #5f2121;
+	--scrollbar-track: #1e293b;
+	--scrollbar-thumb: #475569;
+	--scrollbar-thumb-hover: #64748b;
+}

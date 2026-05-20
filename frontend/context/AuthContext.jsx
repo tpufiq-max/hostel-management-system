@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useCallback } from "react";
+import api, { tokenService } from "../api/api";
 
 export const AuthContext = createContext(null);
 
@@ -9,70 +10,84 @@ export function AuthProvider({ children }) {
 
   // Rehydrate from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem("hms_token");
+    const storedToken = tokenService.getAccess();
     const storedUser = localStorage.getItem("hms_user");
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
+
+    // Listen for session expired event from API interceptor
+    const handleSessionExpired = () => {
+      tokenService.clearTokens();
+      localStorage.removeItem("hms_user");
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener("hms:session-expired", handleSessionExpired);
+    return () => window.removeEventListener("hms:session-expired", handleSessionExpired);
   }, []);
 
-  // Login function
-  const login = useCallback(async (email, password) => {
-    // Admin login
-    if (email === 'admin@hostel.com' && password === 'admin123') {
-      const mockUser = {
-        id: 1,
-        name: 'Admin User',
-        email: 'admin@hostel.com',
-        role: 'admin'
-      };
-      const mockToken = 'mock-jwt-token-admin';
+  // Mock login fallback when backend is unavailable
+  const mockLogin = useCallback((email, password, expectedRole) => {
+    const adminCreds = email === "admin@hostel.com" && password === "admin123";
+    const studentCreds = email === "student@hostel.com" && password === "student123";
 
-      localStorage.setItem("hms_token", mockToken);
-      localStorage.setItem("hms_user", JSON.stringify(mockUser));
-      setToken(mockToken);
-      setUser(mockUser);
-      return mockUser;
+    let mockUser;
+    if (adminCreds) {
+      mockUser = { id: 1, name: "Admin User", email, role: "admin" };
+    } else if (studentCreds) {
+      mockUser = { id: 2, name: "John Doe", email, role: "student" };
+    } else {
+      // Accept any email/password — assign role based on which portal they came from
+      const defaultRole = expectedRole || "admin";
+      mockUser = {
+        id: Date.now(),
+        name: email.split("@")[0],
+        email,
+        role: defaultRole,
+      };
     }
 
-    // Student login
-    if (email === 'student@hostel.com' && password === 'student123') {
-      const mockUser = {
-        id: 2,
-        name: 'John Doe',
-        email: 'student@hostel.com',
-        role: 'student'
-      };
-      const mockToken = 'mock-jwt-token-student';
-
-      localStorage.setItem("hms_token", mockToken);
-      localStorage.setItem("hms_user", JSON.stringify(mockUser));
-      setToken(mockToken);
-      setUser(mockUser);
-      return mockUser;
-    }
-
-    // For demo, also accept any email/password combination as admin
-    const mockUser = {
-      id: Date.now(),
-      name: email.split('@')[0],
-      email: email,
-      role: 'admin'
-    };
-    const mockToken = 'mock-jwt-token-' + Date.now();
-
-    localStorage.setItem("hms_token", mockToken);
+    const mockToken = "mock-jwt-token-" + Date.now();
+    tokenService.setTokens(mockToken, "mock-refresh-" + Date.now());
     localStorage.setItem("hms_user", JSON.stringify(mockUser));
     setToken(mockToken);
     setUser(mockUser);
     return mockUser;
   }, []);
 
+  /**
+   * Login function
+   * @param {string} email
+   * @param {string} password
+   * @param {'admin'|'student'} expectedRole - the portal user is logging in from
+   */
+  const login = useCallback(async (email, password, expectedRole) => {
+    try {
+      const response = await api.post("/auth/login", { email, password });
+      const data = response.data || response;
+      const { accessToken, refreshToken, user: userData } = data;
+
+      tokenService.setTokens(accessToken, refreshToken);
+      localStorage.setItem("hms_user", JSON.stringify(userData));
+
+      setToken(accessToken);
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      // Fallback to mock auth when backend is offline
+      if (error.code === "NETWORK_ERROR" || error.status === 0) {
+        return mockLogin(email, password, expectedRole);
+      }
+      throw error;
+    }
+  }, [mockLogin]);
+
   // Logout function
   const logout = useCallback(() => {
-    localStorage.removeItem("hms_token");
+    tokenService.clearTokens();
     localStorage.removeItem("hms_user");
     setToken(null);
     setUser(null);
@@ -85,6 +100,13 @@ export function AuthProvider({ children }) {
     setUser(merged);
   }, [user]);
 
+  // Helper to check role
+  const hasRole = useCallback((role) => {
+    if (!user) return false;
+    if (Array.isArray(role)) return role.includes(user.role);
+    return user.role === role;
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -92,9 +114,12 @@ export function AuthProvider({ children }) {
         token,
         loading,
         isAuthenticated: !!token,
+        isAdmin: user?.role === "admin" || user?.role === "warden",
+        isStudent: user?.role === "student",
         login,
         logout,
         updateUser,
+        hasRole,
       }}
     >
       {!loading && children}

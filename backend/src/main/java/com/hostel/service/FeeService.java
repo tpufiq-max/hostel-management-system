@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class FeeService {
 
     private final FeeRepository feeRepository;
@@ -43,6 +43,7 @@ public class FeeService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public FeeDTO createFee(FeeDTO dto) {
         Student student = studentRepository.findById(dto.getStudentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + dto.getStudentId()));
@@ -64,6 +65,7 @@ public class FeeService {
         return mapToDTO(fee);
     }
 
+    @Transactional
     public FeeDTO updateFee(Long id, FeeDTO dto) {
         Fee fee = feeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fee record not found with id: " + id));
@@ -79,6 +81,7 @@ public class FeeService {
         return mapToDTO(fee);
     }
 
+    @Transactional
     public void deleteFee(Long id) {
         if (!feeRepository.existsById(id)) {
             throw new ResourceNotFoundException("Fee record not found with id: " + id);

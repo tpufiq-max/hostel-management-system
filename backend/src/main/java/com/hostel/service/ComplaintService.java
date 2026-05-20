@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class ComplaintService {
 
     private final ComplaintRepository complaintRepository;
@@ -42,6 +42,7 @@ public class ComplaintService {
                 .map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional
     public ComplaintDTO createComplaint(ComplaintDTO dto) {
         Student student = studentRepository.findById(dto.getStudentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
@@ -62,6 +63,7 @@ public class ComplaintService {
         return mapToDTO(complaint);
     }
 
+    @Transactional
     public ComplaintDTO updateComplaint(Long id, ComplaintDTO dto) {
         Complaint complaint = complaintRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Complaint not found"));
@@ -83,6 +85,7 @@ public class ComplaintService {
         return mapToDTO(complaint);
     }
 
+    @Transactional
     public void deleteComplaint(Long id) {
         if (!complaintRepository.existsById(id)) {
             throw new ResourceNotFoundException("Complaint not found with id: " + id);

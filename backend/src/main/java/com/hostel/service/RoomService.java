@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class RoomService {
 
     private final RoomRepository roomRepository;
@@ -39,6 +39,7 @@ public class RoomService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public RoomDTO createRoom(RoomDTO dto) {
         if (roomRepository.existsByRoomNumber(dto.getRoomNumber())) {
             throw new BadRequestException("Room with this number already exists");
@@ -48,6 +49,7 @@ public class RoomService {
         return mapToDTO(room);
     }
 
+    @Transactional
     public RoomDTO updateRoom(Long id, RoomDTO dto) {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + id));
@@ -66,6 +68,7 @@ public class RoomService {
         return mapToDTO(room);
     }
 
+    @Transactional
     public void deleteRoom(Long id) {
         if (!roomRepository.existsById(id)) {
             throw new ResourceNotFoundException("Room not found with id: " + id);

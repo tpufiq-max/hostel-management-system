@@ -7,7 +7,9 @@ import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.repository.UserRepository;
 import com.hostel.security.CustomUserDetails;
 import com.hostel.security.JwtTokenProvider;
+import com.hostel.security.LoginAttemptService;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,36 +23,58 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthService(AuthenticationManager authenticationManager,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider tokenProvider) {
+                       JwtTokenProvider tokenProvider,
+                       LoginAttemptService loginAttemptService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.loginAttemptService = loginAttemptService;
     }
 
     public AuthResponse login(AuthRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        String email = request.getEmail();
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        // Rate limiting check
+        if (loginAttemptService.isBlocked(email)) {
+            long minutes = loginAttemptService.getBlockMinutesRemaining(email);
+            throw new BadRequestException(
+                    "Too many failed attempts. Try again in " + minutes + " minute(s)."
+            );
+        }
 
-        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        User user = userDetails.getUser();
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
+            );
 
-        String accessToken = tokenProvider.generateAccessToken(authentication);
-        String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .user(mapToUserDTO(user))
-                .build();
+            // Clear failed attempts on success
+            loginAttemptService.clearAttempts(email);
+
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+            User user = userDetails.getUser();
+
+            String accessToken = tokenProvider.generateAccessToken(authentication);
+            String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .user(mapToUserDTO(user))
+                    .build();
+        } catch (BadCredentialsException e) {
+            // Record failed attempt
+            loginAttemptService.recordFailedAttempt(email);
+            throw e;
+        }
     }
 
     public AuthResponse register(RegisterRequest request) {

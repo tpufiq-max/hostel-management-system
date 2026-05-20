@@ -22,6 +22,11 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --muted: #64748b;
+
+  /* Legacy aliases (used by some pages before migration) */
+  --text: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --background: var(--bg-primary);
 }
 
 .dark {
@@ -44,6 +49,11 @@
   --danger: #f87171;
   --warning: #fbbf24;
   --muted: #94a3b8;
+
+  /* Legacy aliases (used by some pages before migration) */
+  --text: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --background: var(--bg-primary);
 }
 
 * {

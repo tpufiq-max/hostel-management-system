@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
@@ -38,6 +38,7 @@ public class AttendanceService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public AttendanceDTO markAttendance(AttendanceDTO dto) {
         Student student = studentRepository.findById(dto.getStudentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + dto.getStudentId()));
@@ -64,12 +65,14 @@ public class AttendanceService {
         return mapToDTO(attendance);
     }
 
+    @Transactional
     public List<AttendanceDTO> markBulkAttendance(List<AttendanceDTO> dtos) {
         return dtos.stream()
                 .map(this::markAttendance)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public AttendanceDTO updateAttendance(Long id, AttendanceDTO dto) {
         Attendance attendance = attendanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found with id: " + id));

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 public class StudentService {
 
     private final StudentRepository studentRepository;
@@ -38,6 +38,7 @@ public class StudentService {
         return studentRepository.search(query, pageable).map(this::mapToDTO);
     }
 
+    @Transactional
     public StudentDTO createStudent(StudentDTO dto) {
         if (studentRepository.existsByEmail(dto.getEmail())) {
             throw new BadRequestException("Student with this email already exists");
@@ -51,6 +52,7 @@ public class StudentService {
         return mapToDTO(student);
     }
 
+    @Transactional
     public StudentDTO updateStudent(Long id, StudentDTO dto) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
@@ -60,6 +62,7 @@ public class StudentService {
         return mapToDTO(student);
     }
 
+    @Transactional
     public void deleteStudent(Long id) {
         if (!studentRepository.existsById(id)) {
             throw new ResourceNotFoundException("Student not found with id: " + id);

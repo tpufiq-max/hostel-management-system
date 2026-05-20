@@ -1,270 +1,79 @@
 import React, { useState } from 'react';
-import Button from '../components/common/Button';
+import Card from '../components/common/Card';
+import { Plus, Wrench, X } from 'lucide-react';
+
+const mockRequests = [
+  { id: 1, title: 'Broken tap in Room 101', category: 'Plumbing', status: 'PENDING', priority: 'HIGH', createdAt: '2025-03-19' },
+  { id: 2, title: 'Light flickering in corridor', category: 'Electrical', status: 'IN_PROGRESS', priority: 'MEDIUM', createdAt: '2025-03-18' },
+  { id: 3, title: 'Door lock replacement', category: 'General', status: 'COMPLETED', priority: 'LOW', createdAt: '2025-03-15' },
+  { id: 4, title: 'AC not cooling properly', category: 'HVAC', status: 'PENDING', priority: 'HIGH', createdAt: '2025-03-20' },
+];
 
 export default function Maintenance() {
-  const [requests, setRequests] = useState([
-    {
-      id: 1,
-      title: 'Leaking Faucet in Room 101',
-      description: 'Water is leaking from the bathroom faucet',
-      room: '101',
-      priority: 'high',
-      status: 'in-progress',
-      reportedBy: 'Rahul Kumar',
-      reportedDate: '2024-05-15',
-      category: 'Plumbing',
-      assignedTo: 'John - Maintenance Staff',
-      daysOpen: 2
-    },
-    {
-      id: 2,
-      title: 'AC Not Cooling - Room 205',
-      description: 'Air conditioner is running but not cooling properly',
-      room: '205',
-      priority: 'high',
-      status: 'open',
-      reportedBy: 'Priya Sharma',
-      reportedDate: '2024-05-18',
-      category: 'Electrical',
-      assignedTo: null,
-      daysOpen: 0
-    },
-    {
-      id: 3,
-      title: 'Broken Door Lock - Room 310',
-      description: 'Main door lock is not working properly',
-      room: '310',
-      priority: 'medium',
-      status: 'open',
-      reportedBy: 'Aditya Patel',
-      reportedDate: '2024-05-17',
-      category: 'Hardware',
-      assignedTo: null,
-      daysOpen: 1
-    },
-    {
-      id: 4,
-      title: 'Light Bulb Replacement - Room 215',
-      description: 'Two bulbs need to be replaced in the room',
-      room: '215',
-      priority: 'low',
-      status: 'completed',
-      reportedBy: 'Neha Singh',
-      reportedDate: '2024-05-10',
-      category: 'Electrical',
-      assignedTo: 'Mike - Maintenance Staff',
-      daysOpen: 8
-    }
-  ]);
-
-  const [filter, setFilter] = useState('all');
-  const [newRequest, setNewRequest] = useState({
-    title: '',
-    description: '',
-    room: '',
-    priority: 'medium',
-    category: 'Plumbing'
-  });
+  const [requests] = useState(mockRequests);
   const [showForm, setShowForm] = useState(false);
 
-  const categories = ['Plumbing', 'Electrical', 'Hardware', 'Cleaning', 'Other'];
-  const priorities = ['low', 'medium', 'high'];
-  const statuses = ['open', 'in-progress', 'completed'];
-
-  const filteredRequests = filter === 'all'
-    ? requests
-    : requests.filter(r => r.status === filter);
-
-  const handleAddRequest = () => {
-    if (newRequest.title && newRequest.room) {
-      setRequests([
-        {
-          id: Math.max(...requests.map(r => r.id), 0) + 1,
-          ...newRequest,
-          status: 'open',
-          reportedBy: 'Current User',
-          reportedDate: new Date().toISOString().split('T')[0],
-          assignedTo: null,
-          daysOpen: 0
-        },
-        ...requests
-      ]);
-      setNewRequest({
-        title: '',
-        description: '',
-        room: '',
-        priority: 'medium',
-        category: 'Plumbing'
-      });
-      setShowForm(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'open': return 'bg-red-100 text-red-800 border-red-300';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'high': return 'text-red-700 bg-red-50';
-      case 'medium': return 'text-yellow-700 bg-yellow-50';
-      case 'low': return 'text-green-700 bg-green-50';
-      default: return 'text-gray-700 bg-gray-50';
-    }
+  const getStatusBadge = (status) => {
+    const s = { PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', IN_PROGRESS: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', COMPLETED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
+    return `px-2 py-0.5 rounded-full text-[10px] font-medium ${s[status] || s.PENDING}`;
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-4xl font-bold" style={{color: 'var(--text)'}}>Maintenance Requests</h1>
-          <p className="mt-2" style={{color: 'var(--muted)'}}>Track and manage maintenance issues</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--accent)]">Maintenance</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Track repair and maintenance requests</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => setShowForm(!showForm)}
-        >
-          + New Request
-        </Button>
+        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-medium self-start sm:self-auto">
+          <Plus size={16} /> New Request
+        </button>
       </div>
 
-      {/* New Request Form */}
-      {showForm && (
-        <div className="border-2 rounded-xl p-6 space-y-4" style={{backgroundColor: 'var(--surface)', backgroundImage: 'linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(59,130,246,0.02) 100%)', borderColor: 'var(--accent)', borderOpacity: 0.3}}>
-          <h2 className="text-xl font-bold" style={{color: 'var(--text)'}}>Report New Issue</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Issue Title"
-              value={newRequest.title}
-              onChange={(e) => setNewRequest({...newRequest, title: e.target.value})}
-              className="px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
-            />
-            <select
-              value={newRequest.room}
-              onChange={(e) => setNewRequest({...newRequest, room: e.target.value})}
-              className="px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">Select Room</option>
-              {Array.from({length: 120}, (_, i) => (i + 101).toString()).map(room => (
-                <option key={room} value={room}>{room}</option>
-              ))}
-            </select>
-            <select
-              value={newRequest.category}
-              onChange={(e) => setNewRequest({...newRequest, category: e.target.value})}
-              className="px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            <select
-              value={newRequest.priority}
-              onChange={(e) => setNewRequest({...newRequest, priority: e.target.value})}
-              className="px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
-            >
-              {priorities.map(p => (
-                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-              ))}
-            </select>
-          </div>
-          <textarea
-            placeholder="Describe the issue in detail..."
-            value={newRequest.description}
-            onChange={(e) => setNewRequest({...newRequest, description: e.target.value})}
-            rows="3"
-            className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
-          ></textarea>
-          <div className="flex gap-2">
-            <Button variant="primary" onClick={handleAddRequest}>
-              Submit Request
-            </Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'open', 'in-progress', 'completed'].map(status => (
-          <Button
-            key={status}
-            variant={filter === status ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={() => setFilter(status)}
-          >
-            {status === 'all' ? 'All Requests' : status === 'in-progress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
-          </Button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {requests.map(req => (
+          <Card key={req.id} className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                  <Wrench size={16} className="text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm">{req.title}</h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">{req.category} • {req.createdAt}</p>
+                </div>
+              </div>
+              <span className={getStatusBadge(req.status)}>{req.status.replace('_', ' ')}</span>
+            </div>
+          </Card>
         ))}
       </div>
 
-      {/* Requests List */}
-      <div className="space-y-4">
-        {filteredRequests.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-gray-200">
-            <p className="text-gray-600">No maintenance requests found</p>
-          </div>
-        ) : (
-          filteredRequests.map(request => (
-            <div
-              key={request.id}
-              className="bg-[var(--bg-secondary)] border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{request.title}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border-2 ${getStatusColor(request.status)}`}>
-                      {request.status === 'in-progress' ? '⏳ In Progress' : request.status === 'completed' ? '✓ Completed' : '🔴 Open'}
-                    </span>
-                  </div>
-                  <p className="text-gray-600 mb-3">{request.description}</p>
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Room:</span>
-                      <span className="ml-1 font-semibold text-gray-900">{request.room}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Category:</span>
-                      <span className="ml-1 font-semibold text-gray-900">{request.category}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Priority:</span>
-                      <span className={`ml-1 font-semibold px-2 py-1 rounded ${getPriorityColor(request.priority)}`}>
-                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Reported:</span>
-                      <span className="ml-1 font-semibold text-gray-900">{request.reportedDate}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  {request.assignedTo && (
-                    <div className="text-sm mb-2">
-                      <p className="text-gray-500">Assigned to</p>
-                      <p className="font-semibold text-gray-900">{request.assignedTo}</p>
-                    </div>
-                  )}
-                  <Button variant="outline" size="sm">
-                    Update Status
-                  </Button>
-                </div>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-[var(--bg-secondary)] rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-color)]">
+              <h3 className="text-lg font-semibold">New Maintenance Request</h3>
+              <button onClick={() => setShowForm(false)} className="p-2 rounded-lg hover:bg-[var(--bg-primary)]"><X size={18} /></button>
+            </div>
+            <div className="p-4 sm:p-6 space-y-4">
+              <div><label className="block text-xs font-medium mb-1">Title</label><input className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-medium mb-1">Category</label>
+                  <select className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none"><option>Plumbing</option><option>Electrical</option><option>HVAC</option><option>General</option></select></div>
+                <div><label className="block text-xs font-medium mb-1">Priority</label>
+                  <select className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select></div>
+              </div>
+              <div><label className="block text-xs font-medium mb-1">Description</label>
+                <textarea rows={3} className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500" /></div>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-medium">Cancel</button>
+                <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Submit</button>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,220 +1,178 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Card from '../components/common/Card';
+import { Search, Plus, Filter, X, IndianRupee } from 'lucide-react';
 
-const initialFees = [
-  { id: 1, student: 'John Doe', amount: '$1200', dueDate: '2025-06-01', status: 'Paid' },
-  { id: 2, student: 'Jane Smith', amount: '$1100', dueDate: '2025-06-05', status: 'Pending' },
-  { id: 3, student: 'Mike Johnson', amount: '$1300', dueDate: '2025-06-10', status: 'Overdue' },
+const mockFees = [
+  { id: 1, studentName: 'John Doe', rollNumber: '2024001', amount: 5000, dueDate: '2025-03-25', paymentDate: '2025-03-20', paymentStatus: 'PAID', feeType: 'HOSTEL', paymentMethod: 'UPI' },
+  { id: 2, studentName: 'Jane Smith', rollNumber: '2024002', amount: 5000, dueDate: '2025-03-25', paymentDate: null, paymentStatus: 'PENDING', feeType: 'HOSTEL', paymentMethod: null },
+  { id: 3, studentName: 'Mike Johnson', rollNumber: '2024003', amount: 3000, dueDate: '2025-03-15', paymentDate: null, paymentStatus: 'OVERDUE', feeType: 'MESS', paymentMethod: null },
+  { id: 4, studentName: 'Emily Davis', rollNumber: '2024004', amount: 5000, dueDate: '2025-03-25', paymentDate: '2025-03-22', paymentStatus: 'PAID', feeType: 'HOSTEL', paymentMethod: 'Card' },
+  { id: 5, studentName: 'Chris Wilson', rollNumber: '2024005', amount: 2000, dueDate: '2025-03-20', paymentDate: null, paymentStatus: 'PENDING', feeType: 'MAINTENANCE', paymentMethod: null },
 ];
 
-const students = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Alice Brown', 'David Green'];
-const statuses = ['Paid', 'Pending', 'Overdue'];
-
 export default function Fees() {
-  const [fees, setFees] = useState(initialFees);
-  const [showForm, setShowForm] = useState(false);
-  const [editingFee, setEditingFee] = useState(null);
-  const [formData, setFormData] = useState({
-    student: '', amount: '', dueDate: new Date().toISOString().split('T')[0], status: 'Pending'
+  const [fees, setFees] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('ALL');
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => { setFees(mockFees); setLoading(false); }, 500);
+  }, []);
+
+  const filtered = fees.filter(f => {
+    const matchSearch = f.studentName.toLowerCase().includes(search.toLowerCase()) || f.rollNumber.includes(search);
+    const matchFilter = filter === 'ALL' || f.paymentStatus === filter;
+    return matchSearch && matchFilter;
   });
 
-  const handleAddFee = () => {
-    setEditingFee(null);
-    setFormData({ student: '', amount: '', dueDate: new Date().toISOString().split('T')[0], status: 'Pending' });
-    setShowForm(true);
+  const getStatusBadge = (status) => {
+    const styles = {
+      PAID: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      OVERDUE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    };
+    return `px-2 py-0.5 rounded-full text-[10px] font-medium ${styles[status] || styles.PENDING}`;
   };
 
-  const handleEditFee = (fee) => {
-    setEditingFee(fee);
-    setFormData(fee);
-    setShowForm(true);
-  };
+  const totalCollected = fees.filter(f => f.paymentStatus === 'PAID').reduce((acc, f) => acc + f.amount, 0);
+  const totalPending = fees.filter(f => f.paymentStatus !== 'PAID').reduce((acc, f) => acc + f.amount, 0);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingFee) {
-      setFees(fees.map(f => f.id === editingFee.id ? { ...formData, id: editingFee.id } : f));
-    } else {
-      setFees([...fees, { ...formData, id: Date.now() }]);
-    }
-    setShowForm(false);
-  };
-
-  const handleDeleteFee = (id) => {
-    setFees(fees.filter(f => f.id !== id));
-  };
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[60vh]"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>;
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold" style={{color: 'var(--text)'}}>Fees Management</h1>
-          <p className="mt-2" style={{color: 'var(--muted)'}}>Track payments and manage outstanding student fees.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--accent)]">Fees Management</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Track and manage student payments</p>
         </div>
-        <button
-          onClick={handleAddFee}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Fee Record
+        <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-medium self-start sm:self-auto">
+          <Plus size={16} /> Record Payment
         </button>
       </div>
 
-      <div className="rounded-xl shadow-sm border overflow-hidden" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', borderOpacity: 0.2}}>
-        <div className="px-6 py-4 border-b" style={{borderColor: 'var(--accent)', borderOpacity: 0.1, backgroundColor: 'var(--background)'}}>
-          <h3 className="text-lg font-semibold" style={{color: 'var(--text)'}}>Fee Records</h3>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 xs:grid-cols-3 gap-3">
+        <Card className="p-4 text-center">
+          <p className="text-xs text-[var(--text-secondary)]">Total Collected</p>
+          <p className="text-xl font-bold text-green-600 mt-1">₹{totalCollected.toLocaleString()}</p>
+        </Card>
+        <Card className="p-4 text-center">
+          <p className="text-xs text-[var(--text-secondary)]">Pending Amount</p>
+          <p className="text-xl font-bold text-orange-600 mt-1">₹{totalPending.toLocaleString()}</p>
+        </Card>
+        <Card className="p-4 text-center">
+          <p className="text-xs text-[var(--text-secondary)]">Total Records</p>
+          <p className="text-xl font-bold mt-1">{fees.length}</p>
+        </Card>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+          <input type="text" placeholder="Search by student name or roll..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead style={{backgroundColor: 'var(--background)'}}>
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{color: 'var(--muted)'}}>
-                  Student
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{color: 'var(--muted)'}}>
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{color: 'var(--muted)'}}>
-                  Due Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{color: 'var(--muted)'}}>
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{color: 'var(--muted)'}}>
-                  Actions
-                </th>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {['ALL', 'PAID', 'PENDING', 'OVERDUE'].map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${filter === f ? 'bg-blue-600 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border-color)]'}`}>
+              {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop Table */}
+      <Card className="hidden md:block overflow-hidden">
+        <div className="table-responsive">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border-color)] bg-[var(--bg-primary)]">
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Student</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Type</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Amount</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)] hidden lg:table-cell">Due Date</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)] hidden lg:table-cell">Method</th>
+                <th className="text-left px-4 py-3 font-medium text-[var(--text-secondary)]">Status</th>
               </tr>
             </thead>
-            <tbody style={{backgroundColor: 'var(--surface)'}}>
-              {fees.map((fee) => (
-                <tr key={fee.id} className="hover:shadow-md" style={{borderColor: 'var(--accent)', borderOpacity: 0.1, backgroundColor: 'var(--surface)'}}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white font-semibold text-sm mr-3">
-                        {fee.student.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div className="text-sm font-medium" style={{color: 'var(--text)'}}>{fee.student}</div>
-                    </div>
+            <tbody>
+              {filtered.map(fee => (
+                <tr key={fee.id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-primary)] transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{fee.studentName}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{fee.rollNumber}</p>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold" style={{color: 'var(--text)'}}>
-                    {fee.amount}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {fee.dueDate}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      fee.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                      fee.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {fee.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditFee(fee)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFee(fee.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Remove
-                    </button>
-                  </td>
+                  <td className="px-4 py-3 text-xs">{fee.feeType}</td>
+                  <td className="px-4 py-3 font-semibold">₹{fee.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-xs hidden lg:table-cell">{fee.dueDate}</td>
+                  <td className="px-4 py-3 text-xs hidden lg:table-cell">{fee.paymentMethod || '—'}</td>
+                  <td className="px-4 py-3"><span className={getStatusBadge(fee.paymentStatus)}>{fee.paymentStatus}</span></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {/* Mobile Card Layout */}
+      <div className="md:hidden space-y-3">
+        {filtered.map(fee => (
+          <Card key={fee.id} className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium text-sm">{fee.studentName}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{fee.rollNumber} • {fee.feeType}</p>
+              </div>
+              <span className={getStatusBadge(fee.paymentStatus)}>{fee.paymentStatus}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-lg font-bold">₹{fee.amount.toLocaleString()}</p>
+              <p className="text-xs text-[var(--text-secondary)]">Due: {fee.dueDate}</p>
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-secondary)] rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {editingFee ? 'Edit Fee Record' : 'Add Fee Record'}
-                </h2>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      {/* Payment Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-[var(--bg-secondary)] rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-color)]">
+              <h3 className="text-lg font-semibold">Record Payment</h3>
+              <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-[var(--bg-primary)]"><X size={18} /></button>
+            </div>
+            <div className="p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1">Student</label>
+                <select className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                  <option>Select student</option>
+                  {fees.map(f => <option key={f.id}>{f.studentName}</option>)}
+                </select>
               </div>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Student</label>
-                  <select
-                    value={formData.student}
-                    onChange={(e) => setFormData({...formData, student: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    <option value="">Select student</option>
-                    {students.map(student => (
-                      <option key={student} value={student}>{student}</option>
-                    ))}
+                  <label className="block text-xs font-medium mb-1">Amount (₹)</label>
+                  <input type="number" className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Method</label>
+                  <select className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>UPI</option><option>Card</option><option>Cash</option><option>Bank Transfer</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
-                  <input
-                    type="text"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="$1200"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    {statuses.map(status => (
-                      <option key={status} value={status}>{status}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                  >
-                    {editingFee ? 'Update' : 'Add'} Fee Record
-                  </button>
-                </div>
-              </form>
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-medium">Cancel</button>
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Record Payment</button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,185 +1,231 @@
-import React, { useState } from 'react';
-import Modal from '../components/common/Modal';
+import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
+import { Search, Plus, BedDouble, Users, X } from 'lucide-react';
+import roomService from '../services/roomService';
 
-const initialRooms = [
-  { id: 1, number: '101', type: 'Single', capacity: 1, status: 'Available', floor: '1st' },
-  { id: 2, number: '102', type: 'Double', capacity: 2, status: 'Occupied', floor: '1st' },
-  { id: 3, number: '201', type: 'Triple', capacity: 3, status: 'Available', floor: '2nd' },
-  { id: 4, number: '202', type: 'Dormitory', capacity: 8, status: 'Maintenance', floor: '2nd' },
+const fallbackRooms = [
+  { id: 1, roomNumber: '101', capacity: 2, occupied: 2, block: 'A', floor: 1, type: 'DOUBLE', status: 'OCCUPIED', monthlyRent: 5000 },
+  { id: 2, roomNumber: '102', capacity: 2, occupied: 1, block: 'A', floor: 1, type: 'DOUBLE', status: 'AVAILABLE', monthlyRent: 5000 },
+  { id: 3, roomNumber: '103', capacity: 3, occupied: 3, block: 'A', floor: 1, type: 'TRIPLE', status: 'OCCUPIED', monthlyRent: 4000 },
+  { id: 4, roomNumber: '104', capacity: 2, occupied: 0, block: 'A', floor: 1, type: 'DOUBLE', status: 'MAINTENANCE', monthlyRent: 5000 },
+  { id: 5, roomNumber: '201', capacity: 1, occupied: 1, block: 'A', floor: 2, type: 'SINGLE', status: 'OCCUPIED', monthlyRent: 7000 },
+  { id: 6, roomNumber: '202', capacity: 2, occupied: 0, block: 'A', floor: 2, type: 'DOUBLE', status: 'AVAILABLE', monthlyRent: 5000 },
+  { id: 7, roomNumber: '203', capacity: 3, occupied: 2, block: 'B', floor: 2, type: 'TRIPLE', status: 'AVAILABLE', monthlyRent: 4000 },
+  { id: 8, roomNumber: '301', capacity: 2, occupied: 0, block: 'B', floor: 3, type: 'DOUBLE', status: 'AVAILABLE', monthlyRent: 5000 },
 ];
 
 export default function Rooms() {
-  const [rooms, setRooms] = useState(initialRooms);
-  const [showForm, setShowForm] = useState(false);
-  const [editingRoom, setEditingRoom] = useState(null);
-  const [formData, setFormData] = useState({
-    number: '', type: 'Single', capacity: 1, status: 'Available', floor: '1st'
+  const [rooms, setRooms] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('ALL');
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await roomService.getAll(0, 50);
+        const data = response?.data || response;
+        const list = data?.content || data || [];
+        setRooms(list.length > 0 ? list : fallbackRooms);
+      } catch {
+        setRooms(fallbackRooms);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const filtered = rooms.filter(r => {
+    const matchesSearch = r.roomNumber.includes(search) || r.block.toLowerCase().includes(search.toLowerCase());
+    const matchesFilter = filter === 'ALL' || r.status === filter;
+    return matchesSearch && matchesFilter;
   });
 
-  const handleAddRoom = () => {
-    setEditingRoom(null);
-    setFormData({ number: '', type: 'Single', capacity: 1, status: 'Available', floor: '1st' });
-    setShowForm(true);
+  const getStatusColor = (status) => {
+    const colors = {
+      AVAILABLE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      OCCUPIED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      MAINTENANCE: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+      RESERVED: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    };
+    return colors[status] || colors.AVAILABLE;
   };
 
-  const handleEditRoom = (room) => {
-    setEditingRoom(room);
-    setFormData(room);
-    setShowForm(true);
+  const stats = {
+    total: rooms.length,
+    available: rooms.filter(r => r.status === 'AVAILABLE').length,
+    occupied: rooms.filter(r => r.status === 'OCCUPIED').length,
+    maintenance: rooms.filter(r => r.status === 'MAINTENANCE').length,
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingRoom) {
-      setRooms(rooms.map(r => r.id === editingRoom.id ? { ...formData, id: editingRoom.id } : r));
-    } else {
-      setRooms([...rooms, { ...formData, id: Date.now() }]);
-    }
-    setShowForm(false);
-  };
-
-  const handleDeleteRoom = (id) => {
-    setRooms(rooms.filter(r => r.id !== id));
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold" style={{color: 'var(--text)'}}>Rooms</h1>
-          <p className="mt-2" style={{color: 'var(--muted)'}}>Manage room inventory and availability.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[var(--accent)]">Rooms</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Manage hostel rooms and allocations</p>
         </div>
         <button
-          onClick={handleAddRoom}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium self-start sm:self-auto"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Room
+          <Plus size={16} /> Add Room
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {rooms.map((room) => (
-          <Card key={room.id} className="p-6 hover:shadow-lg hover:scale-105 transition-all" style={{backgroundColor: 'var(--surface)'}}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide" style={{color: 'var(--accent)'}}>Room {room.number}</p>
-                <h2 className="mt-1 text-xl font-semibold" style={{color: 'var(--text)'}}>{room.type}</h2>
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+          <p className="text-xs text-[var(--text-secondary)]">Total Rooms</p>
+          <p className="text-xl font-bold mt-1">{stats.total}</p>
+        </div>
+        <div className="p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+          <p className="text-xs text-green-600">Available</p>
+          <p className="text-xl font-bold mt-1 text-green-600">{stats.available}</p>
+        </div>
+        <div className="p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+          <p className="text-xs text-blue-600">Occupied</p>
+          <p className="text-xl font-bold mt-1 text-blue-600">{stats.occupied}</p>
+        </div>
+        <div className="p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+          <p className="text-xs text-orange-600">Maintenance</p>
+          <p className="text-xl font-bold mt-1 text-orange-600">{stats.maintenance}</p>
+        </div>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+          <input
+            type="text"
+            placeholder="Search by room number or block..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {['ALL', 'AVAILABLE', 'OCCUPIED', 'MAINTENANCE'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                filter === f ? 'bg-blue-600 text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:bg-[var(--bg-primary)]'
+              }`}
+            >
+              {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Room Grid - responsive */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        {filtered.map(room => (
+          <Card key={room.id} className="p-4 hover:scale-[1.02] transition-transform">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <BedDouble size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Room {room.roomNumber}</p>
+                  <p className="text-[10px] text-[var(--text-secondary)]">Block {room.block} • Floor {room.floor}</p>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditRoom(room)}
-                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                  aria-label={`Edit room ${room.number}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => handleDeleteRoom(room.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                  aria-label={`Delete room ${room.number}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span style={{color: 'var(--muted)'}}>Capacity:</span>
-                <span className="font-medium" style={{color: 'var(--text)'}}>{room.capacity}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span style={{color: 'var(--muted)'}}>Floor:</span>
-                <span className="font-medium" style={{color: 'var(--text)'}}>{room.floor}</span>
-              </div>
-            </div>
-            <div className="mt-4">
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                room.status === 'Available' ? 'bg-green-100 text-green-700' :
-                room.status === 'Occupied' ? 'bg-blue-100 text-blue-700' :
-                'bg-amber-100 text-amber-700'
-              }`}>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(room.status)}`}>
                 {room.status}
               </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-[var(--text-secondary)]">Type</span>
+                <span className="font-medium">{room.type}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[var(--text-secondary)]">Occupancy</span>
+                <span className="font-medium">{room.occupied}/{room.capacity}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[var(--text-secondary)]">Rent</span>
+                <span className="font-medium">₹{room.monthlyRent.toLocaleString()}/mo</span>
+              </div>
+            </div>
+
+            {/* Occupancy bar */}
+            <div className="mt-3">
+              <div className="h-1.5 rounded-full bg-[var(--border-color)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    room.occupied === room.capacity ? 'bg-red-500' : room.occupied > 0 ? 'bg-blue-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${(room.occupied / room.capacity) * 100}%` }}
+                />
+              </div>
             </div>
           </Card>
         ))}
       </div>
 
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editingRoom ? 'Edit Room' : 'Add New Room'} size="md">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Room Number</label>
-            <input
-              type="text"
-              value={formData.number}
-              onChange={(e) => setFormData({...formData, number: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
+      {filtered.length === 0 && (
+        <div className="text-center py-12">
+          <BedDouble size={48} className="mx-auto text-[var(--text-secondary)] opacity-50" />
+          <p className="text-lg font-medium text-[var(--text-secondary)] mt-3">No rooms found</p>
+        </div>
+      )}
+
+      {/* Add Room Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-[var(--bg-secondary)] rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-color)]">
+              <h3 className="text-lg font-semibold">Add Room</h3>
+              <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-[var(--bg-primary)]"><X size={18} /></button>
+            </div>
+            <div className="p-4 sm:p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Room Number</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Capacity</label>
+                  <input type="number" className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Block</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Floor</label>
+                  <input type="number" className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Monthly Rent (₹)</label>
+                <input type="number" className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-medium">Cancel</button>
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">Create Room</button>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({...formData, type: e.target.value, capacity: e.target.value === 'Single' ? 1 : e.target.value === 'Double' ? 2 : e.target.value === 'Triple' ? 3 : 8})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="Single">Single</option>
-              <option value="Double">Double</option>
-              <option value="Triple">Triple</option>
-              <option value="Dormitory">Dormitory</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Floor</label>
-            <select
-              value={formData.floor}
-              onChange={(e) => setFormData({...formData, floor: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="Ground">Ground</option>
-              <option value="1st">1st Floor</option>
-              <option value="2nd">2nd Floor</option>
-              <option value="3rd">3rd Floor</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({...formData, status: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="Available">Available</option>
-              <option value="Occupied">Occupied</option>
-              <option value="Maintenance">Maintenance</option>
-            </select>
-          </div>
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-            >
-              {editingRoom ? 'Update' : 'Add'} Room
-            </button>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }

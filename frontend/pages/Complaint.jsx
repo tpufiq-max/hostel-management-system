@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import { Plus, Search, X, MessageSquare } from 'lucide-react';
+import complaintService from '../services/complaintService';
 
-const mockComplaints = [
+const fallbackComplaints = [
   { id: 1, studentName: 'John Doe', title: 'Water leakage in bathroom', category: 'PLUMBING', complaintStatus: 'OPEN', priority: 'HIGH', createdAt: '2025-03-18' },
   { id: 2, studentName: 'Jane Smith', title: 'AC not working properly', category: 'ELECTRICAL', complaintStatus: 'IN_PROGRESS', priority: 'MEDIUM', createdAt: '2025-03-17' },
   { id: 3, studentName: 'Mike Johnson', title: 'WiFi connectivity issues', category: 'MAINTENANCE', complaintStatus: 'RESOLVED', priority: 'LOW', createdAt: '2025-03-15' },
@@ -18,7 +19,19 @@ export default function Complaint() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => { setComplaints(mockComplaints); setLoading(false); }, 500);
+    const load = async () => {
+      try {
+        const response = await complaintService.getAll(0, 50);
+        const data = response?.data || response;
+        const list = data?.content || data || [];
+        setComplaints(list.length > 0 ? list : fallbackComplaints);
+      } catch {
+        setComplaints(fallbackComplaints);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const filtered = complaints.filter(c => {

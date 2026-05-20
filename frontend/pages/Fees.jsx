@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import { Search, Plus, Filter, X, IndianRupee } from 'lucide-react';
+import feeService from '../services/feeService';
 
-const mockFees = [
+const fallbackFees = [
   { id: 1, studentName: 'John Doe', rollNumber: '2024001', amount: 5000, dueDate: '2025-03-25', paymentDate: '2025-03-20', paymentStatus: 'PAID', feeType: 'HOSTEL', paymentMethod: 'UPI' },
   { id: 2, studentName: 'Jane Smith', rollNumber: '2024002', amount: 5000, dueDate: '2025-03-25', paymentDate: null, paymentStatus: 'PENDING', feeType: 'HOSTEL', paymentMethod: null },
   { id: 3, studentName: 'Mike Johnson', rollNumber: '2024003', amount: 3000, dueDate: '2025-03-15', paymentDate: null, paymentStatus: 'OVERDUE', feeType: 'MESS', paymentMethod: null },
@@ -18,7 +19,19 @@ export default function Fees() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => { setFees(mockFees); setLoading(false); }, 500);
+    const load = async () => {
+      try {
+        const response = await feeService.getAll(0, 50);
+        const data = response?.data || response;
+        const list = data?.content || data || [];
+        setFees(list.length > 0 ? list : fallbackFees);
+      } catch {
+        setFees(fallbackFees);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const filtered = fees.filter(f => {

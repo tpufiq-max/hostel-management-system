@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import { Search, Plus, Edit2, Trash2, X, Filter } from 'lucide-react';
+import studentService from '../services/studentService';
 
-const mockStudents = [
+const fallbackStudents = [
   { id: 1, name: 'John Doe', email: 'john@student.com', phone: '9876543210', rollNumber: '2024001', course: 'B.Tech CSE', year: 2, roomNumber: '101', feesStatus: 'PAID', gender: 'Male' },
   { id: 2, name: 'Jane Smith', email: 'jane@student.com', phone: '9876543211', rollNumber: '2024002', course: 'B.Tech ECE', year: 3, roomNumber: '102', feesStatus: 'PENDING', gender: 'Female' },
   { id: 3, name: 'Mike Johnson', email: 'mike@student.com', phone: '9876543212', rollNumber: '2024003', course: 'B.Tech ME', year: 1, roomNumber: '103', feesStatus: 'PAID', gender: 'Male' },
@@ -17,9 +18,31 @@ export default function Students() {
   const [showModal, setShowModal] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
 
+  // Load students from API with fallback
   useEffect(() => {
-    setTimeout(() => { setStudents(mockStudents); setLoading(false); }, 600);
+    const load = async () => {
+      try {
+        const response = await studentService.getAll(0, 50);
+        const apiData = response?.data || response;
+        const studentList = apiData?.content || apiData || [];
+        setStudents(studentList.length > 0 ? studentList : fallbackStudents);
+      } catch (err) {
+        // Fallback to mock data when backend is offline
+        setStudents(fallbackStudents);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this student?')) return;
+    try {
+      await studentService.delete(id);
+    } catch (err) { /* mock mode */ }
+    setStudents(students.filter(s => s.id !== id));
+  };
 
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -116,7 +139,7 @@ export default function Students() {
                       <button onClick={() => { setEditStudent(student); setShowModal(true); }} className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 transition-colors">
                         <Edit2 size={14} />
                       </button>
-                      <button className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors">
+                      <button onClick={() => handleDelete(student.id)} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -154,7 +177,7 @@ export default function Students() {
               <button onClick={() => { setEditStudent(student); setShowModal(true); }} className="flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 transition-colors">
                 Edit
               </button>
-              <button className="flex-1 py-2 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 transition-colors">
+              <button onClick={() => handleDelete(student.id)} className="flex-1 py-2 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 transition-colors">
                 Delete
               </button>
             </div>

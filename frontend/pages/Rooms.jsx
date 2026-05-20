@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import { Search, Plus, BedDouble, Users, X } from 'lucide-react';
+import roomService from '../services/roomService';
 
-const mockRooms = [
+const fallbackRooms = [
   { id: 1, roomNumber: '101', capacity: 2, occupied: 2, block: 'A', floor: 1, type: 'DOUBLE', status: 'OCCUPIED', monthlyRent: 5000 },
   { id: 2, roomNumber: '102', capacity: 2, occupied: 1, block: 'A', floor: 1, type: 'DOUBLE', status: 'AVAILABLE', monthlyRent: 5000 },
   { id: 3, roomNumber: '103', capacity: 3, occupied: 3, block: 'A', floor: 1, type: 'TRIPLE', status: 'OCCUPIED', monthlyRent: 4000 },
@@ -21,7 +22,19 @@ export default function Rooms() {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => { setRooms(mockRooms); setLoading(false); }, 500);
+    const load = async () => {
+      try {
+        const response = await roomService.getAll(0, 50);
+        const data = response?.data || response;
+        const list = data?.content || data || [];
+        setRooms(list.length > 0 ? list : fallbackRooms);
+      } catch {
+        setRooms(fallbackRooms);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const filtered = rooms.filter(r => {

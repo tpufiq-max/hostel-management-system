@@ -1,13 +1,23 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ThemeContext } from "../../context/ThemeContext";
 import { AuthContext } from "../../context/AuthContext";
-import { Moon, Sun, Menu, Bell, User, LogOut, Settings, ChevronDown } from "lucide-react";
+import { Moon, Sun, Menu, Bell, User, LogOut, KeyRound, ChevronDown } from "lucide-react";
 
 export default function Navbar({ onMenuClick }) {
   const { theme, toggleTheme } = useContext(ThemeContext);
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, isStudent } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const profilePath = isStudent ? "/student/profile" : "/admin/dashboard";
+  const changePasswordPath = isStudent ? "/student/change-password" : "/admin/change-password";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -91,17 +101,17 @@ export default function Navbar({ onMenuClick }) {
                   {user?.role}
                 </span>
               </div>
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-primary)] transition-colors">
+              <button onClick={() => navigate(profilePath)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-primary)] transition-colors">
                 <User size={16} />
                 <span>Profile</span>
               </button>
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-primary)] transition-colors">
-                <Settings size={16} />
-                <span>Settings</span>
+              <button onClick={() => navigate(changePasswordPath)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-primary)] transition-colors">
+                <KeyRound size={16} />
+                <span>Change Password</span>
               </button>
               <div className="border-t border-[var(--border-color)] mt-1 pt-1">
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <LogOut size={16} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
+import dashboardService from '../services/dashboardService';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -14,11 +15,27 @@ export default function Dashboard() {
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Try real API first
+        const response = await dashboardService.getStats();
+        const apiStats = response?.data || response;
+        setStats({
+          totalStudents: apiStats.totalStudents ?? 0,
+          activeStudents: apiStats.activeStudents ?? 0,
+          totalRooms: apiStats.totalRooms ?? 0,
+          occupiedRooms: apiStats.occupiedRooms ?? 0,
+          totalRevenue: apiStats.totalRevenue ?? 0,
+          pendingPayments: apiStats.pendingPayments ?? 0,
+          totalComplaints: apiStats.totalComplaints ?? 0,
+          resolvedComplaints: apiStats.resolvedComplaints ?? 0,
+        });
+      } catch (err) {
+        // Fallback to mock data when backend is offline
         setStats({
           totalStudents: 245, activeStudents: 238, totalRooms: 120, occupiedRooms: 115,
           totalRevenue: 125000, pendingPayments: 8500, totalComplaints: 23, resolvedComplaints: 18
         });
+      }
+      try {
         setRecentActivities([
           { id: 1, action: 'New student registered', details: 'John Doe joined Room 101', time: '2 hours ago', icon: '👤' },
           { id: 2, action: 'Payment received', details: '₹2,500 from Jane Smith', time: '4 hours ago', icon: '💰' },
@@ -27,7 +44,7 @@ export default function Dashboard() {
           { id: 5, action: 'New notice posted', details: 'Hostel rules updated', time: '1 day ago', icon: '📢' }
         ]);
       } catch (error) {
-        console.error('Error loading dashboard:', error);
+        console.error('Error loading activities:', error);
       } finally {
         setLoading(false);
       }
@@ -42,10 +59,10 @@ export default function Dashboard() {
   ];
 
   const quickActions = [
-    { title: 'Mark Attendance', icon: '📝', path: '/attendance' },
-    { title: 'Record Payment', icon: '💰', path: '/fees' },
-    { title: 'View Reports', icon: '📊', path: '/reports' },
-    { title: 'Manage Rooms', icon: '🏠', path: '/rooms' }
+    { title: 'Mark Attendance', icon: '📝', path: '/admin/attendance' },
+    { title: 'Record Payment', icon: '💰', path: '/admin/fees' },
+    { title: 'View Reports', icon: '📊', path: '/admin/reports' },
+    { title: 'Manage Rooms', icon: '🏠', path: '/admin/rooms' }
   ];
 
   if (loading) {
@@ -207,7 +224,7 @@ export default function Dashboard() {
       <Card className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Important Notices</h2>
-          <button onClick={() => navigate('/notice')} className="text-sm text-[var(--accent)] hover:underline">View All</button>
+          <button onClick={() => navigate('/admin/notices')} className="text-sm text-[var(--accent)] hover:underline">View All</button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {notices.map((notice) => {

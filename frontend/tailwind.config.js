@@ -3,7 +3,15 @@ export default {
   darkMode: 'class',
   content: [
     './index.html',
-    './**/*.{js,jsx}',
+    './pages/**/*.{js,jsx}',
+    './components/**/*.{js,jsx}',
+    './context/**/*.{js,jsx}',
+    './hooks/**/*.{js,jsx}',
+    './features/**/*.{js,jsx}',
+    './services/**/*.{js,jsx}',
+    './App.jsx',
+    './main.jsx',
+    './routes.jsx',
   ],
   theme: {
     extend: {

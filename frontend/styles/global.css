@@ -18,6 +18,15 @@
 
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  --success: #16a34a;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --muted: #64748b;
+
+  /* Legacy aliases used by some pages */
+  --text: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --background: var(--bg-primary);
 }
 
 .dark {
@@ -36,6 +45,15 @@
 
   --accent: #3b82f6;
   --accent-hover: #60a5fa;
+  --success: #22c55e;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --muted: #94a3b8;
+
+  /* Legacy aliases used by some pages */
+  --text: var(--text-primary);
+  --surface: var(--bg-secondary);
+  --background: var(--bg-primary);
 }
 
 * {
@@ -52,13 +70,15 @@ body,
 }
 
 body {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   transition:
     background-color 0.35s ease,
     color 0.35s ease;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -70,46 +90,30 @@ select {
 
 button {
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
 }
 
-button:hover {
-  transform: translateY(-1px);
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
+/* Card styles */
 .card-ui {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow: var(--card-shadow);
   transition: all 0.3s ease;
 }
 
 .card-ui:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 .text-secondary {
   color: var(--text-secondary);
 }
 
-.theme-transition,
-.theme-transition *,
-.theme-transition *::before,
-.theme-transition *::after {
-  transition:
-    background-color 0.35s ease,
-    color 0.35s ease,
-    border-color 0.35s ease,
-    box-shadow 0.35s ease !important;
-}
-
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -121,23 +125,26 @@ button:active {
   border-radius: 100px;
 }
 
-.sidebar {
-  background: var(--bg-sidebar);
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
 }
 
-.navbar-ui {
-  background: rgba(255, 255, 255, 0.7);
-  border-bottom: 1px solid var(--border-color);
-  backdrop-filter: blur(20px);
+/* Theme transition */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 0.35s ease,
+    color 0.35s ease,
+    border-color 0.35s ease,
+    box-shadow 0.35s ease !important;
 }
 
-.dark .navbar-ui {
-  background: rgba(2, 6, 23, 0.7);
-}
-
+/* Dashboard stat cards */
 .dashboard-stat-card {
-  padding: 1.5rem;
-  border-radius: 24px;
+  padding: 1.25rem;
+  border-radius: 16px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   box-shadow: var(--card-shadow);
@@ -145,5 +152,72 @@ button:active {
 }
 
 .dashboard-stat-card:hover {
-  transform: translateY(-4px) scale(1.01);
+  transform: translateY(-3px) scale(1.01);
+}
+
+/* Progress bar */
+.progress-track {
+  height: 8px;
+  border-radius: 100px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--accent), #60a5fa);
+  transition: width 0.5s ease;
+}
+
+/* Utility classes */
+.text-theme {
+  color: var(--text-primary);
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.bg-surface {
+  background: var(--bg-secondary);
+}
+
+.label-sm {
+  color: var(--text-secondary);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Responsive table wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-friendly touch targets */
+@media (max-width: 640px) {
+  button, a {
+    min-height: 40px;
+  }
+}
+
+/* Stat icon wrapper */
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .stat-icon {
+    width: 40px;
+    height: 40px;
+  }
 }

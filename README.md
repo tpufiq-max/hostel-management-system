@@ -1,105 +1,247 @@
 # Hostel Management System
 
-A modern, responsive web application for managing hostel operations built with React, Vite, and Tailwind CSS.
-
-## Features
-
-- **Dashboard**: Overview of hostel statistics and notices
-- **Student Management**: Add, edit, and manage student records
-- **Room Management**: Track room allocations and availability
-- **Fees Management**: Handle student fee payments and records
-- **Complaint System**: Manage student complaints and resolutions
-- **Attendance Tracking**: Monitor student attendance
-- **Visitor Management**: Track hostel visitors
-- **Notice Board**: Post and manage hostel notices
-- **Reports**: Generate various reports and analytics
+A professional full-stack hostel management application with a responsive React frontend and Spring Boot backend.
 
 ## Tech Stack
 
-- **Frontend**: React 18 with Vite
-- **Styling**: Tailwind CSS
-- **Routing**: React Router DOM
-- **State Management**: React Context API
-- **Icons**: Heroicons (via SVG)
+### Frontend
+- **React 18** with Vite 5
+- **Tailwind CSS 3.4** with custom design system
+- **React Router DOM 6** for navigation
+- **Axios** with interceptors for API communication
+- **Lucide React** for icons
+- **JWT** token-based authentication
 
-## Getting Started
+### Backend
+- **Java 17** with Spring Boot 3.2
+- **Spring Security** with JWT authentication
+- **Spring Data JPA** with Hibernate
+- **MySQL** (production) / **H2** (development)
+- **Maven** build system
+- **Lombok** for boilerplate reduction
 
-### Prerequisites
-
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Installation
-
-1. Clone the repository
-2. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-5. Open [http://localhost:5173](http://localhost:5173) in your browser
-
-### Demo Credentials
-
-- **Email**: admin@hostel.com
-- **Password**: admin123
+---
 
 ## Project Structure
 
 ```
-frontend/
-├── components/
-│   ├── common/          # Reusable UI components
-│   └── layout/          # Layout components (Sidebar, Navbar)
-├── context/             # React Context for state management
-├── features/            # Feature-specific components and services
-├── pages/               # Main application pages
-├── styles/              # Global styles and CSS
-├── hooks/               # Custom React hooks
-├── api/                 # API configuration and utilities
-├── config/              # Application configuration
-└── routes.jsx           # Application routing
+hostel-management-system/
+├── frontend/                  # React + Vite frontend
+│   ├── api/                   # Axios instance & interceptors
+│   ├── components/
+│   │   ├── common/            # Reusable UI components
+│   │   └── layout/            # Layout, Sidebar, Navbar
+│   ├── context/               # Auth & Theme contexts
+│   ├── hooks/                 # Custom React hooks
+│   ├── pages/                 # All page components
+│   ├── services/              # API service modules
+│   ├── styles/                # Global CSS & variables
+│   ├── config/                # App constants
+│   └── features/              # Feature-based modules
+│
+├── backend/                   # Spring Boot backend
+│   └── src/main/java/com/hostel/
+│       ├── config/            # Security, CORS, data init
+│       ├── controller/        # REST API controllers
+│       ├── dto/               # Data Transfer Objects
+│       ├── entity/            # JPA entities
+│       ├── exception/         # Exception handling
+│       ├── repository/        # Spring Data repositories
+│       ├── security/          # JWT & auth filters
+│       └── service/           # Business logic
 ```
 
-## Available Scripts
+---
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
+## Quick Start
 
-## Features Overview
+### Prerequisites
+- **Node.js** 18+ and npm
+- **Java 17+** (JDK)
+- **Maven** 3.8+
+- **MySQL** 8.0+ (for production; H2 is used for development)
+
+---
+
+### 1. Run Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs at: **http://localhost:5173**
+
+### 2. Run Backend (Development Mode with H2)
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+Backend runs at: **http://localhost:8080**
+
+H2 Console available at: **http://localhost:8080/h2-console**
+- JDBC URL: `jdbc:h2:mem:hosteldb`
+- Username: `sa`
+- Password: (empty)
+
+### 3. Run Backend (Production Mode with MySQL)
+
+#### MySQL Setup
+```sql
+CREATE DATABASE hostel_db;
+CREATE USER 'hostel_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON hostel_db.* TO 'hostel_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+#### Run with MySQL profile
+```bash
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=prod \
+  -Dspring-boot.run.arguments="--DB_USERNAME=hostel_user --DB_PASSWORD=your_password"
+```
+
+---
+
+## Demo Credentials
+
+| Role    | Email               | Password    |
+|---------|---------------------|-------------|
+| Admin   | admin@hostel.com    | admin123    |
+| Student | student@hostel.com  | student123  |
+
+---
+
+## API Endpoints
 
 ### Authentication
-- Secure login system with role-based access
-- JWT token-based authentication
-- Protected routes
+| Method | Endpoint           | Description         |
+|--------|-------------------|---------------------|
+| POST   | /api/auth/login    | User login          |
+| POST   | /api/auth/register | User registration   |
+| POST   | /api/auth/refresh  | Refresh JWT token   |
 
-### Responsive Design
-- Mobile-first approach
-- Responsive grid layouts
-- Adaptive navigation
+### Students
+| Method | Endpoint                | Description         |
+|--------|------------------------|---------------------|
+| GET    | /api/students          | List all (paginated)|
+| GET    | /api/students/{id}     | Get by ID           |
+| GET    | /api/students/search   | Search students     |
+| POST   | /api/students          | Create student      |
+| PUT    | /api/students/{id}     | Update student      |
+| DELETE | /api/students/{id}     | Delete student      |
 
-### Modern UI/UX
-- Clean, modern interface
-- Consistent design system
-- Smooth animations and transitions
-- Dark/light theme support (expandable)
+### Rooms
+| Method | Endpoint              | Description         |
+|--------|-----------------------|---------------------|
+| GET    | /api/rooms            | List all (paginated)|
+| GET    | /api/rooms/{id}       | Get by ID           |
+| GET    | /api/rooms/available  | Available rooms     |
+| POST   | /api/rooms            | Create room         |
+| PUT    | /api/rooms/{id}       | Update room         |
+| DELETE | /api/rooms/{id}       | Delete room         |
 
-## Contributing
+### Fees
+| Method | Endpoint                   | Description         |
+|--------|---------------------------|---------------------|
+| GET    | /api/fees                  | List all            |
+| GET    | /api/fees/{id}             | Get by ID           |
+| GET    | /api/fees/student/{id}     | Student's fees      |
+| POST   | /api/fees                  | Create fee record   |
+| PUT    | /api/fees/{id}             | Update fee          |
+| DELETE | /api/fees/{id}             | Delete fee          |
 
-1. Follow the existing code style
-2. Use Tailwind CSS for styling
-3. Ensure responsive design
-4. Test on multiple screen sizes
-5. Follow React best practices
+### Attendance
+| Method | Endpoint                        | Description          |
+|--------|---------------------------------|----------------------|
+| GET    | /api/attendance/date/{date}     | Get by date          |
+| GET    | /api/attendance/student/{id}    | Student attendance   |
+| POST   | /api/attendance                 | Mark attendance      |
+| POST   | /api/attendance/bulk            | Bulk mark            |
+| PUT    | /api/attendance/{id}            | Update record        |
 
-## License
+### Complaints
+| Method | Endpoint                        | Description          |
+|--------|---------------------------------|----------------------|
+| GET    | /api/complaints                 | List all             |
+| GET    | /api/complaints/{id}            | Get by ID            |
+| GET    | /api/complaints/student/{id}    | Student complaints   |
+| POST   | /api/complaints                 | Create complaint     |
+| PUT    | /api/complaints/{id}            | Update status        |
+| DELETE | /api/complaints/{id}            | Delete complaint     |
 
-This project is licensed under the MIT License.
+### Dashboard
+| Method | Endpoint              | Description          |
+|--------|-----------------------|----------------------|
+| GET    | /api/dashboard/stats  | Dashboard statistics |
+
+---
+
+## Environment Variables
+
+### Frontend (`frontend/.env`)
+```env
+VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+### Backend (`backend/src/main/resources/application.properties`)
+```properties
+app.jwt.secret=your-secret-key
+app.jwt.expiration=86400000
+app.cors.allowed-origins=http://localhost:5173
+```
+
+---
+
+## Features
+
+- **Responsive Design** - Works on mobile, tablet, and desktop
+- **Dark/Light Theme** - Toggle between themes
+- **JWT Authentication** - Secure token-based auth with refresh
+- **Role-Based Access** - Admin, Warden, Student roles
+- **Student Management** - Full CRUD with search
+- **Room Management** - Allocation, status tracking
+- **Fee Management** - Payment tracking, status badges
+- **Attendance** - Mark, bulk mark, reports
+- **Complaints** - Submit, track, resolve
+- **Dashboard** - Real-time statistics
+- **Reports** - Exportable reports
+- **Notifications** - Toast notifications
+- **Mobile Navigation** - Hamburger menu with slide-in sidebar
+
+---
+
+## Testing the API
+
+### Login (get JWT token)
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@hostel.com","password":"admin123"}'
+```
+
+### Use token for authenticated requests
+```bash
+curl http://localhost:8080/api/students \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+---
+
+## Build for Production
+
+### Frontend
+```bash
+cd frontend
+npm run build    # Output in dist/
+```
+
+### Backend
+```bash
+cd backend
+mvn clean package -DskipTests    # Output: target/hostel-management-system-1.0.0.jar
+java -jar target/hostel-management-system-1.0.0.jar --spring.profiles.active=prod
+```

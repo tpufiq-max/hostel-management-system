@@ -12,6 +12,10 @@ import lombok.NoArgsConstructor;
 public class AuthResponse {
     private String accessToken;
     private String refreshToken;
+
+    // Field initialiser is ignored by @Builder — set the default in builder method instead
+    @Builder.Default
     private String tokenType = "Bearer";
+
     private UserDTO user;
 }

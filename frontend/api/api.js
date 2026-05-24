@@ -10,7 +10,7 @@ import axios from "axios";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 const TIMEOUT  = 15_000; // 15 s
 
-// Token keys stored in localStorage
+// Token keys stored in localStorage (must stay in sync with config.js)
 const ACCESS_TOKEN_KEY  = "hms_access_token";
 const REFRESH_TOKEN_KEY = "hms_refresh_token";
 
@@ -19,8 +19,8 @@ export const tokenService = {
   getAccess:      ()      => localStorage.getItem(ACCESS_TOKEN_KEY),
   getRefresh:     ()      => localStorage.getItem(REFRESH_TOKEN_KEY),
   setTokens:      (a, r)  => {
-    localStorage.setItem(ACCESS_TOKEN_KEY,  a);
-    localStorage.setItem(REFRESH_TOKEN_KEY, r);
+    if (a) localStorage.setItem(ACCESS_TOKEN_KEY,  a);
+    if (r) localStorage.setItem(REFRESH_TOKEN_KEY, r);
   },
   clearTokens:    ()      => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -39,6 +39,11 @@ export const tokenService = {
 };
 
 // ── 3. Create Axios instance ──────────────────────────────────
+//
+//  withCredentials is OFF because our backend uses bearer tokens, not
+//  cookies, and turning it on combined with `*` CORS origins makes the
+//  browser block every request.
+//
 const api = axios.create({
   baseURL:         BASE_URL,
   timeout:         TIMEOUT,
@@ -46,7 +51,6 @@ const api = axios.create({
     "Content-Type": "application/json",
     Accept:         "application/json",
   },
-  withCredentials: true, // send cookies if backend uses them
 });
 
 // ── 4. Request interceptor — attach Bearer token ──────────────
@@ -57,9 +61,9 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log requests in development
     if (import.meta.env.DEV) {
-      console.log(`[API ➜] ${config.method?.toUpperCase()} ${config.url}`, config.data ?? "");
+      // eslint-disable-next-line no-console
+      console.debug(`[API ➜] ${config.method?.toUpperCase()} ${config.url}`);
     }
 
     return config;
@@ -79,20 +83,29 @@ const processQueue = (error, token = null) => {
 };
 
 // ── 6. Response interceptor — handle errors & auto-refresh ────
+//
+//  Backend wraps every successful response in:
+//    { success, message, data, errors }
+//  We unwrap to `data` (the envelope) so callers always see the same
+//  shape and can read `response.success` / `response.message`.
+//
 api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV) {
-      console.log(`[API ✓] ${response.status} ${response.config.url}`);
-    }
-    // Unwrap data envelope if backend wraps in { success, data, message }
-    return response.data?.data !== undefined ? response.data : response.data;
-  },
+  (response) => response.data,
 
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
 
     // ── 6a. 401 — try silent token refresh ───────────────────
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip refresh attempts on the auth endpoints themselves to avoid loops.
+    const isAuthEndpoint =
+      typeof originalRequest.url === "string" &&
+      originalRequest.url.includes("/auth/");
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
@@ -113,11 +126,20 @@ api.interceptors.response.use(
         const refreshToken = tokenService.getRefresh();
         if (!refreshToken) throw new Error("No refresh token");
 
-        const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
-          refreshToken,
-        });
+        // Use raw axios (not our instance) so this request doesn't get
+        // re-intercepted into another refresh attempt.
+        const { data: envelope } = await axios.post(
+          `${BASE_URL}/auth/refresh`,
+          { refreshToken }
+        );
 
-        const { accessToken, refreshToken: newRefresh } = data;
+        // Backend wraps in { success, message, data: { accessToken, refreshToken } }
+        const payload      = envelope?.data ?? envelope;
+        const accessToken  = payload?.accessToken;
+        const newRefresh   = payload?.refreshToken;
+
+        if (!accessToken) throw new Error("Refresh response missing accessToken");
+
         tokenService.setTokens(accessToken, newRefresh);
 
         api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -128,9 +150,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         tokenService.clearTokens();
-        // Redirect to login
+        // Let the AuthContext clear user state and redirect
         window.dispatchEvent(new CustomEvent("hms:session-expired"));
-        return Promise.reject(refreshError);
+        return Promise.reject(normaliseError(refreshError));
       } finally {
         isRefreshing = false;
       }
@@ -140,6 +162,7 @@ api.interceptors.response.use(
     const apiError = normaliseError(error);
 
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.error(`[API ✗] ${error.response?.status} ${originalRequest?.url}`, apiError.message);
     }
 
@@ -160,13 +183,12 @@ function normaliseError(error) {
       message: data?.message || data?.error || getDefaultMessage(status),
       status,
       code:    data?.code    || null,
-      errors:  data?.errors  || [],  // validation errors array
+      errors:  data?.errors  || [],  // validation errors map / array
       raw:     data,
     };
   }
 
   if (error.request) {
-    // Request made but no response (network down / timeout)
     return {
       message: "Network error — please check your connection.",
       status:  0,
@@ -175,7 +197,6 @@ function normaliseError(error) {
     };
   }
 
-  // Unexpected setup error
   return {
     message: error.message || "Unexpected error occurred.",
     status:  -1,
@@ -202,13 +223,13 @@ function getDefaultMessage(status) {
 }
 
 // ── 8. Convenience request wrappers ──────────────────────────
-/**
- * Use these instead of api.get / api.post for cleaner call sites:
- *
- *   import { get, post } from "@/api/api";
- *   const students = await get("/students");
- *   const result   = await post("/students", payload);
- */
+//
+//  All wrappers return the unwrapped response envelope, e.g.
+//    const res = await get("/students");
+//    res.success // true
+//    res.data    // payload
+//    res.message // human-readable message
+//
 export const get    = (url, config)         => api.get(url, config);
 export const post   = (url, data, config)   => api.post(url, data, config);
 export const put    = (url, data, config)   => api.put(url, data, config);
@@ -220,7 +241,7 @@ export const upload = (url, formData, onProgress) =>
   api.post(url, formData, {
     headers: { "Content-Type": "multipart/form-data" },
     onUploadProgress: (evt) => {
-      if (onProgress) {
+      if (onProgress && evt.total) {
         onProgress(Math.round((evt.loaded * 100) / evt.total));
       }
     },

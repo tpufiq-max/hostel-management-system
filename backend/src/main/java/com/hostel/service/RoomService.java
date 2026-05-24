@@ -7,6 +7,7 @@ import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.repository.RoomRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,12 +24,12 @@ public class RoomService {
         this.roomRepository = roomRepository;
     }
 
-    public Page<RoomDTO> getAllRooms(Pageable pageable) {
+    public Page<RoomDTO> getAllRooms(@NonNull Pageable pageable) {
         return roomRepository.findAll(pageable).map(this::mapToDTO);
     }
 
-    public RoomDTO getRoomById(Long id) {
-        Room room = roomRepository.findById(id)
+    public RoomDTO getRoomById(@NonNull Long id) {
+        Room room = roomRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + id));
         return mapToDTO(room);
     }
@@ -39,6 +40,7 @@ public class RoomService {
                 .collect(Collectors.toList());
     }
 
+    @SuppressWarnings("null")
     public RoomDTO createRoom(RoomDTO dto) {
         if (roomRepository.existsByRoomNumber(dto.getRoomNumber())) {
             throw new BadRequestException("Room with this number already exists");
@@ -48,8 +50,9 @@ public class RoomService {
         return mapToDTO(room);
     }
 
-    public RoomDTO updateRoom(Long id, RoomDTO dto) {
-        Room room = roomRepository.findById(id)
+    @SuppressWarnings("null")
+    public RoomDTO updateRoom(@NonNull Long id, RoomDTO dto) {
+        Room room = roomRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + id));
 
         if (dto.getRoomNumber() != null) room.setRoomNumber(dto.getRoomNumber());
@@ -66,11 +69,11 @@ public class RoomService {
         return mapToDTO(room);
     }
 
-    public void deleteRoom(Long id) {
-        if (!roomRepository.existsById(id)) {
+    public void deleteRoom(@NonNull Long id) {
+        if (!roomRepository.existsById((Long) id)) {
             throw new ResourceNotFoundException("Room not found with id: " + id);
         }
-        roomRepository.deleteById(id);
+        roomRepository.deleteById((Long) id);
     }
 
     private RoomDTO mapToDTO(Room room) {

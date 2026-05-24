@@ -23,6 +23,7 @@ public class Room {
     @Column(nullable = false)
     private Integer capacity;
 
+    @Builder.Default
     @Column(nullable = false)
     private Integer occupied = 0;
 
@@ -30,10 +31,12 @@ public class Room {
 
     private Integer floor;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RoomType type = RoomType.DOUBLE;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RoomStatus status = RoomStatus.AVAILABLE;

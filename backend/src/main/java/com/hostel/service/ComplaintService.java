@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,22 +29,29 @@ public class ComplaintService {
     }
 
     public Page<ComplaintDTO> getAllComplaints(Pageable pageable) {
+        Objects.requireNonNull(pageable, "Pageable must not be null");
         return complaintRepository.findAll(pageable).map(this::mapToDTO);
     }
 
     public ComplaintDTO getComplaintById(Long id) {
+        Objects.requireNonNull(id, "ID must not be null");
         Complaint complaint = complaintRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Complaint not found with id: " + id));
         return mapToDTO(complaint);
     }
 
     public List<ComplaintDTO> getStudentComplaints(Long studentId) {
+        Objects.requireNonNull(studentId, "Student ID must not be null");
         return complaintRepository.findByStudentId(studentId).stream()
                 .map(this::mapToDTO).collect(Collectors.toList());
     }
 
     public ComplaintDTO createComplaint(ComplaintDTO dto) {
-        Student student = studentRepository.findById(dto.getStudentId())
+        Long studentId = dto.getStudentId();
+        if (studentId == null) {
+            throw new IllegalArgumentException("Student ID must not be null");
+        }
+        Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
 
         Complaint complaint = Complaint.builder()
@@ -58,11 +66,12 @@ public class ComplaintService {
                 .assignedTo(dto.getAssignedTo())
                 .build();
 
-        complaint = complaintRepository.save(complaint);
+        complaint = complaintRepository.save(Objects.requireNonNull(complaint));
         return mapToDTO(complaint);
     }
 
     public ComplaintDTO updateComplaint(Long id, ComplaintDTO dto) {
+        Objects.requireNonNull(id, "ID must not be null");
         Complaint complaint = complaintRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Complaint not found"));
 
@@ -79,11 +88,12 @@ public class ComplaintService {
         if (dto.getResolutionNotes() != null) complaint.setResolutionNotes(dto.getResolutionNotes());
         if (dto.getAssignedTo() != null) complaint.setAssignedTo(dto.getAssignedTo());
 
-        complaint = complaintRepository.save(complaint);
+        complaint = complaintRepository.save(Objects.requireNonNull(complaint));
         return mapToDTO(complaint);
     }
 
     public void deleteComplaint(Long id) {
+        Objects.requireNonNull(id, "ID must not be null");
         if (!complaintRepository.existsById(id)) {
             throw new ResourceNotFoundException("Complaint not found with id: " + id);
         }

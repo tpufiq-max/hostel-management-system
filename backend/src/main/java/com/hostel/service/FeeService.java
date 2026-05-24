@@ -8,6 +8,7 @@ import com.hostel.repository.FeeRepository;
 import com.hostel.repository.StudentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,25 +28,30 @@ public class FeeService {
         this.studentRepository = studentRepository;
     }
 
-    public Page<FeeDTO> getAllFees(Pageable pageable) {
+    public Page<FeeDTO> getAllFees(@NonNull Pageable pageable) {
         return feeRepository.findAll(pageable).map(this::mapToDTO);
     }
 
-    public FeeDTO getFeeById(Long id) {
-        Fee fee = feeRepository.findById(id)
+    public FeeDTO getFeeById(@NonNull Long id) {
+        Fee fee = feeRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fee record not found with id: " + id));
         return mapToDTO(fee);
     }
 
-    public List<FeeDTO> getStudentFees(Long studentId) {
-        return feeRepository.findByStudentId(studentId).stream()
+    public List<FeeDTO> getStudentFees(@NonNull Long studentId) {
+        return feeRepository.findByStudentId((Long) studentId).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
+    @SuppressWarnings("null")
     public FeeDTO createFee(FeeDTO dto) {
-        Student student = studentRepository.findById(dto.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + dto.getStudentId()));
+        Long studentId = dto.getStudentId();
+        if (studentId == null) {
+            throw new IllegalArgumentException("Student ID must not be null");
+        }
+        Student student = studentRepository.findById((Long) studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + studentId));
 
         Fee fee = Fee.builder()
                 .student(student)
@@ -60,12 +66,13 @@ public class FeeService {
                 .semester(dto.getSemester())
                 .build();
 
-        fee = feeRepository.save(fee);
+        fee = feeRepository.save((Fee) fee);
         return mapToDTO(fee);
     }
 
-    public FeeDTO updateFee(Long id, FeeDTO dto) {
-        Fee fee = feeRepository.findById(id)
+    @SuppressWarnings("null")
+    public FeeDTO updateFee(@NonNull Long id, FeeDTO dto) {
+        Fee fee = feeRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fee record not found with id: " + id));
 
         if (dto.getAmount() != null) fee.setAmount(dto.getAmount());
@@ -75,15 +82,15 @@ public class FeeService {
         if (dto.getTransactionId() != null) fee.setTransactionId(dto.getTransactionId());
         if (dto.getDescription() != null) fee.setDescription(dto.getDescription());
 
-        fee = feeRepository.save(fee);
+        fee = feeRepository.save((Fee) fee);
         return mapToDTO(fee);
     }
 
-    public void deleteFee(Long id) {
-        if (!feeRepository.existsById(id)) {
+    public void deleteFee(@NonNull Long id) {
+        if (!feeRepository.existsById((Long) id)) {
             throw new ResourceNotFoundException("Fee record not found with id: " + id);
         }
-        feeRepository.deleteById(id);
+        feeRepository.deleteById((Long) id);
     }
 
     private FeeDTO mapToDTO(Fee fee) {

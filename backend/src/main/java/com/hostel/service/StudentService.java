@@ -7,10 +7,12 @@ import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.repository.StudentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,20 +26,21 @@ public class StudentService {
         this.studentRepository = studentRepository;
     }
 
-    public Page<StudentDTO> getAllStudents(Pageable pageable) {
+    public Page<StudentDTO> getAllStudents(@NonNull Pageable pageable) {
         return studentRepository.findAll(pageable).map(this::mapToDTO);
     }
 
-    public StudentDTO getStudentById(Long id) {
-        Student student = studentRepository.findById(id)
+    public StudentDTO getStudentById(@NonNull Long id) {
+        Student student = studentRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
         return mapToDTO(student);
     }
 
-    public Page<StudentDTO> searchStudents(String query, Pageable pageable) {
+    public Page<StudentDTO> searchStudents(String query, @NonNull Pageable pageable) {
         return studentRepository.search(query, pageable).map(this::mapToDTO);
     }
 
+    @SuppressWarnings("null")
     public StudentDTO createStudent(StudentDTO dto) {
         if (studentRepository.existsByEmail(dto.getEmail())) {
             throw new BadRequestException("Student with this email already exists");
@@ -51,20 +54,31 @@ public class StudentService {
         return mapToDTO(student);
     }
 
-    public StudentDTO updateStudent(Long id, StudentDTO dto) {
-        Student student = studentRepository.findById(id)
+    @SuppressWarnings("null")
+    public StudentDTO updateStudent(@NonNull Long id, StudentDTO dto) {
+        Student student = studentRepository.findById((Long) id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
+
+        if (dto.getEmail() != null && !dto.getEmail().equalsIgnoreCase(student.getEmail()) &&
+                studentRepository.existsByEmail(dto.getEmail())) {
+            throw new BadRequestException("Student with this email already exists");
+        }
+
+        if (dto.getRollNumber() != null && !dto.getRollNumber().equals(student.getRollNumber()) &&
+                studentRepository.existsByRollNumber(dto.getRollNumber())) {
+            throw new BadRequestException("Student with this roll number already exists");
+        }
 
         updateEntityFromDTO(student, dto);
         student = studentRepository.save(student);
         return mapToDTO(student);
     }
 
-    public void deleteStudent(Long id) {
-        if (!studentRepository.existsById(id)) {
+    public void deleteStudent(@NonNull Long id) {
+        if (!studentRepository.existsById((Long) id)) {
             throw new ResourceNotFoundException("Student not found with id: " + id);
         }
-        studentRepository.deleteById(id);
+        studentRepository.deleteById((Long) id);
     }
 
     public List<StudentDTO> getActiveStudents() {
@@ -113,14 +127,33 @@ public class StudentService {
                 .guardianName(dto.getGuardianName())
                 .guardianPhone(dto.getGuardianPhone())
                 .address(dto.getAddress())
-                .dateOfBirth(dto.getDateOfBirth() != null ? LocalDate.parse(dto.getDateOfBirth()) : null)
+                .dateOfBirth(dto.getDateOfBirth() != null ? parseDate(dto.getDateOfBirth(), "date of birth") : null)
                 .gender(dto.getGender())
                 .bloodGroup(dto.getBloodGroup())
-                .feesStatus(dto.getFeesStatus() != null ? Student.FeesStatus.valueOf(dto.getFeesStatus()) : Student.FeesStatus.PENDING)
+                .feesStatus(parseFeesStatus(dto.getFeesStatus()))
                 .profileImage(dto.getProfileImage())
                 .isActive(true)
-                .admissionDate(dto.getAdmissionDate() != null ? LocalDate.parse(dto.getAdmissionDate()) : LocalDate.now())
+                .admissionDate(dto.getAdmissionDate() != null ? parseDate(dto.getAdmissionDate(), "admission date") : LocalDate.now())
                 .build();
+    }
+
+    private LocalDate parseDate(String date, String fieldName) {
+        try {
+            return LocalDate.parse(date);
+        } catch (DateTimeParseException ex) {
+            throw new BadRequestException("Invalid " + fieldName + " format. Expected YYYY-MM-DD");
+        }
+    }
+
+    private Student.FeesStatus parseFeesStatus(String feesStatus) {
+        if (feesStatus == null) {
+            return Student.FeesStatus.PENDING;
+        }
+        try {
+            return Student.FeesStatus.valueOf(feesStatus.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid fees status: " + feesStatus);
+        }
     }
 
     private void updateEntityFromDTO(Student student, StudentDTO dto) {
@@ -136,8 +169,11 @@ public class StudentService {
         if (dto.getGuardianName() != null) student.setGuardianName(dto.getGuardianName());
         if (dto.getGuardianPhone() != null) student.setGuardianPhone(dto.getGuardianPhone());
         if (dto.getAddress() != null) student.setAddress(dto.getAddress());
+        if (dto.getDateOfBirth() != null) student.setDateOfBirth(parseDate(dto.getDateOfBirth(), "date of birth"));
         if (dto.getGender() != null) student.setGender(dto.getGender());
         if (dto.getBloodGroup() != null) student.setBloodGroup(dto.getBloodGroup());
-        if (dto.getFeesStatus() != null) student.setFeesStatus(Student.FeesStatus.valueOf(dto.getFeesStatus()));
+        if (dto.getFeesStatus() != null) student.setFeesStatus(parseFeesStatus(dto.getFeesStatus()));
+        if (dto.getProfileImage() != null) student.setProfileImage(dto.getProfileImage());
+        if (dto.getAdmissionDate() != null) student.setAdmissionDate(parseDate(dto.getAdmissionDate(), "admission date"));
     }
 }

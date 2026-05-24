@@ -28,7 +28,11 @@ public class JwtTokenProvider {
 
     public String generateAccessToken(Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        return generateToken(userDetails.getUsername(), userDetails.getUser().getRole().name(), jwtExpiration);
+        return generateToken(
+            userDetails.getUsername(),
+            userDetails.getUser().getRole().name(),
+            jwtExpiration
+        );
     }
 
     public String generateAccessToken(String email, String role) {
@@ -40,7 +44,7 @@ public class JwtTokenProvider {
     }
 
     private String generateToken(String subject, String role, long expiration) {
-        Date now = new Date();
+        Date now        = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         JwtBuilder builder = Jwts.builder()
@@ -57,12 +61,12 @@ public class JwtTokenProvider {
     }
 
     public String getEmailFromToken(String token) {
-        Claims claims = Jwts.parser()
+        return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
-                .getPayload();
-        return claims.getSubject();
+                .getPayload()
+                .getSubject();
     }
 
     public boolean validateToken(String token) {

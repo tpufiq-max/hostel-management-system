@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,18 +40,19 @@ public class AttendanceService {
     }
 
     public AttendanceDTO markAttendance(AttendanceDTO dto) {
-        Student student = studentRepository.findById(dto.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + dto.getStudentId()));
+        Long studentId = Objects.requireNonNull(dto.getStudentId(), "Student ID is required");
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + studentId));
 
         LocalDate date = LocalDate.parse(dto.getDate());
 
         // Check if attendance already marked for this student on this date
-        attendanceRepository.findByStudentIdAndDate(dto.getStudentId(), date)
+        attendanceRepository.findByStudentIdAndDate(studentId, date)
                 .ifPresent(existing -> {
                     throw new BadRequestException("Attendance already marked for this student on " + date);
                 });
 
-        Attendance attendance = Attendance.builder()
+        Attendance attendance = Objects.requireNonNull(Attendance.builder()
                 .student(student)
                 .date(date)
                 .status(Attendance.AttendanceStatus.valueOf(dto.getStatus()))
@@ -58,9 +60,9 @@ public class AttendanceService {
                 .checkOutTime(dto.getCheckOutTime())
                 .remarks(dto.getRemarks())
                 .markedBy(dto.getMarkedBy())
-                .build();
+                .build());
 
-        attendance = attendanceRepository.save(attendance);
+        attendance = attendanceRepository.save(Objects.requireNonNull(attendance));
         return mapToDTO(attendance);
     }
 
@@ -71,15 +73,16 @@ public class AttendanceService {
     }
 
     public AttendanceDTO updateAttendance(Long id, AttendanceDTO dto) {
-        Attendance attendance = attendanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found with id: " + id));
+        Long attendanceId = Objects.requireNonNull(id, "Attendance ID is required");
+        Attendance attendance = attendanceRepository.findById(attendanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found with id: " + attendanceId));
 
         if (dto.getStatus() != null) attendance.setStatus(Attendance.AttendanceStatus.valueOf(dto.getStatus()));
         if (dto.getCheckInTime() != null) attendance.setCheckInTime(dto.getCheckInTime());
         if (dto.getCheckOutTime() != null) attendance.setCheckOutTime(dto.getCheckOutTime());
         if (dto.getRemarks() != null) attendance.setRemarks(dto.getRemarks());
 
-        attendance = attendanceRepository.save(attendance);
+        attendance = attendanceRepository.save(Objects.requireNonNull(attendance));
         return mapToDTO(attendance);
     }
 

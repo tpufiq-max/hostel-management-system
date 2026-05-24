@@ -36,6 +36,7 @@ public class PasswordService {
      * the email exists (security best practice — don't leak account existence).
      * In production, the token would be emailed to the user.
      */
+    @SuppressWarnings("null")
     public String forgotPassword(String email) {
         return userRepository.findByEmail(email)
                 .map(user -> {

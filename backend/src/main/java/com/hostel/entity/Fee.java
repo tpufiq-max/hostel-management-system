@@ -30,6 +30,7 @@ public class Fee {
     @Column(name = "payment_date")
     private LocalDate paymentDate;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_status", nullable = false)
     private PaymentStatus paymentStatus = PaymentStatus.PENDING;
@@ -42,6 +43,7 @@ public class Fee {
 
     private String description;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "fee_type")
     private FeeType feeType = FeeType.HOSTEL;

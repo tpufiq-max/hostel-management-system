@@ -30,10 +30,12 @@ public class Complaint {
     @Column(nullable = false)
     private ComplaintCategory category;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "complaint_status", nullable = false)
     private ComplaintStatus complaintStatus = ComplaintStatus.OPEN;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     private Priority priority = Priority.MEDIUM;
 

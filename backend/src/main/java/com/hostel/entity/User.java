@@ -37,6 +37,7 @@ public class User {
     @Column(name = "profile_image")
     private String profileImage;
 
+    @Builder.Default
     @Column(name = "is_active")
     private boolean isActive = true;
 

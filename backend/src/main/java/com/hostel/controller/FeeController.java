@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,17 +25,17 @@ public class FeeController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<FeeDTO>>> getAllFees(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<FeeDTO>>> getAllFees(@PageableDefault(size = 10) @NonNull Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(feeService.getAllFees(pageable)));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<FeeDTO>> getFeeById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<FeeDTO>> getFeeById(@PathVariable @NonNull Long id) {
         return ResponseEntity.ok(ApiResponse.success(feeService.getFeeById(id)));
     }
 
     @GetMapping("/student/{studentId}")
-    public ResponseEntity<ApiResponse<List<FeeDTO>>> getStudentFees(@PathVariable Long studentId) {
+    public ResponseEntity<ApiResponse<List<FeeDTO>>> getStudentFees(@PathVariable @NonNull Long studentId) {
         return ResponseEntity.ok(ApiResponse.success(feeService.getStudentFees(studentId)));
     }
 
@@ -46,13 +47,13 @@ public class FeeController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
-    public ResponseEntity<ApiResponse<FeeDTO>> updateFee(@PathVariable Long id, @RequestBody FeeDTO dto) {
+    public ResponseEntity<ApiResponse<FeeDTO>> updateFee(@PathVariable @NonNull Long id, @RequestBody FeeDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Fee updated", feeService.updateFee(id, dto)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteFee(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteFee(@PathVariable @NonNull Long id) {
         feeService.deleteFee(id);
         return ResponseEntity.ok(ApiResponse.success("Fee deleted", null));
     }

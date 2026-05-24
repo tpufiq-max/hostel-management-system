@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,12 +25,12 @@ public class RoomController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<RoomDTO>>> getAllRooms(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<ApiResponse<Page<RoomDTO>>> getAllRooms(@PageableDefault(size = 10) @NonNull Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(roomService.getAllRooms(pageable)));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<RoomDTO>> getRoomById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<RoomDTO>> getRoomById(@PathVariable @NonNull Long id) {
         return ResponseEntity.ok(ApiResponse.success(roomService.getRoomById(id)));
     }
 
@@ -46,13 +47,13 @@ public class RoomController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<RoomDTO>> updateRoom(@PathVariable Long id, @RequestBody RoomDTO dto) {
+    public ResponseEntity<ApiResponse<RoomDTO>> updateRoom(@PathVariable @NonNull Long id, @RequestBody RoomDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Room updated successfully", roomService.updateRoom(id, dto)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteRoom(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteRoom(@PathVariable @NonNull Long id) {
         roomService.deleteRoom(id);
         return ResponseEntity.ok(ApiResponse.success("Room deleted successfully", null));
     }

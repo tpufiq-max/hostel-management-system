@@ -56,6 +56,7 @@ public class Student {
     @Column(name = "blood_group")
     private String bloodGroup;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "fees_status")
     private FeesStatus feesStatus = FeesStatus.PENDING;
@@ -63,6 +64,7 @@ public class Student {
     @Column(name = "profile_image")
     private String profileImage;
 
+    @Builder.Default
     @Column(name = "is_active")
     private boolean isActive = true;
 

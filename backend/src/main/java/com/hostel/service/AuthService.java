@@ -14,6 +14,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 public class AuthService {
 
@@ -61,7 +63,7 @@ public class AuthService {
             throw new BadRequestException("Username is already taken");
         }
 
-        User user = User.builder()
+        User user = Objects.requireNonNull(User.builder()
                 .name(request.getName())
                 .username(request.getUsername())
                 .email(request.getEmail())
@@ -69,9 +71,9 @@ public class AuthService {
                 .role(User.Role.valueOf(request.getRole().toUpperCase()))
                 .phone(request.getPhone())
                 .isActive(true)
-                .build();
+                .build());
 
-        user = userRepository.save(user);
+        user = Objects.requireNonNull(userRepository.save(user));
 
         String accessToken = tokenProvider.generateAccessToken(user.getEmail(), user.getRole().name());
         String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());

@@ -1,8 +1,10 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 import { AuthContext } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
-import Layout from './components/layout/Layout';
+import Layout from './layouts/Layout';
+
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Students from './pages/Students';
@@ -20,7 +22,6 @@ import Analytics from './pages/Analytics';
 import StudentProfiles from './pages/StudentProfiles';
 import Maintenance from './pages/Maintenance';
 import EventCalendar from './pages/EventCalendar';
-import FinancialDashboard from './pages/FinancialDashboard';
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useContext(AuthContext);
@@ -46,23 +47,23 @@ function AppRoutes() {
       ) : (
         <Layout>
           <Routes>
-            <Route path='/' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path='/students' element={<ProtectedRoute allowedRoles={['admin']}><Students /></ProtectedRoute>} />
-            <Route path='/rooms' element={<ProtectedRoute allowedRoles={['admin']}><Rooms /></ProtectedRoute>} />
-            <Route path='/allocation' element={<ProtectedRoute allowedRoles={['admin']}><Allocation /></ProtectedRoute>} />
-            <Route path='/mess' element={<ProtectedRoute allowedRoles={['admin']}><Mess /></ProtectedRoute>} />
-            <Route path='/fees' element={<ProtectedRoute allowedRoles={['admin']}><Fees /></ProtectedRoute>} />
-            <Route path='/complaint' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Complaint /></ProtectedRoute>} />
-            <Route path='/attendance' element={<ProtectedRoute allowedRoles={['admin']}><Attendance /></ProtectedRoute>} />
-            <Route path='/visitor' element={<ProtectedRoute allowedRoles={['admin']}><Visitor /></ProtectedRoute>} />
-            <Route path='/notice' element={<ProtectedRoute allowedRoles={['admin']}><Notice /></ProtectedRoute>} />
-            <Route path='/reports' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Reports /></ProtectedRoute>} />
-            <Route path='/analytics' element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
-            <Route path='/student-profiles' element={<ProtectedRoute allowedRoles={['admin']}><StudentProfiles /></ProtectedRoute>} />
-            <Route path='/maintenance' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Maintenance /></ProtectedRoute>} />
-            <Route path='/events' element={<ProtectedRoute allowedRoles={['admin', 'student']}><EventCalendar /></ProtectedRoute>} />
-            <Route path='/financial' element={<ProtectedRoute allowedRoles={['admin']}><FinancialDashboard /></ProtectedRoute>} />
-            <Route path='*' element={<NotFound />} />
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/students" element={<ProtectedRoute allowedRoles={['admin']}><Students /></ProtectedRoute>} />
+            <Route path="/rooms" element={<ProtectedRoute allowedRoles={['admin']}><Rooms /></ProtectedRoute>} />
+            <Route path="/allocation" element={<ProtectedRoute allowedRoles={['admin']}><Allocation /></ProtectedRoute>} />
+            <Route path="/mess" element={<ProtectedRoute allowedRoles={['admin']}><Mess /></ProtectedRoute>} />
+            <Route path="/fees" element={<ProtectedRoute allowedRoles={['admin']}><Fees /></ProtectedRoute>} />
+            <Route path="/complaint" element={<ProtectedRoute allowedRoles={['admin', 'student']}><Complaint /></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute allowedRoles={['admin']}><Attendance /></ProtectedRoute>} />
+            <Route path="/visitor" element={<ProtectedRoute allowedRoles={['admin']}><Visitor /></ProtectedRoute>} />
+            <Route path="/notice" element={<ProtectedRoute allowedRoles={['admin']}><Notice /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin', 'student']}><Reports /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
+            <Route path="/student-profiles" element={<ProtectedRoute allowedRoles={['admin']}><StudentProfiles /></ProtectedRoute>} />
+            <Route path="/maintenance" element={<ProtectedRoute allowedRoles={['admin', 'student']}><Maintenance /></ProtectedRoute>} />
+            <Route path="/events" element={<ProtectedRoute allowedRoles={['admin', 'student']}><EventCalendar /></ProtectedRoute>} />
+            {/* /financial route removed: FinancialDashboard.jsx deleted in F2 (was 100% fake data) */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
       )}

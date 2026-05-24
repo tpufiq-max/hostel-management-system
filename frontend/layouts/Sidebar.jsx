@@ -1,24 +1,24 @@
-import React, { useState, useContext } from "react";
+import React, { useContext, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ThemeContext } from "../../context/ThemeContext";
+import { ThemeContext } from "../context/ThemeContext";
+import { AuthContext } from "../context/AuthContext";
 
 const menuItems = [
-  { name: "Dashboard",   path: "/",                icon: "🏠", section: "main"    },
-  { name: "Students",    path: "/students",         icon: "👥", section: "main"    },
-  { name: "Rooms",       path: "/rooms",            icon: "🚪", section: "main"    },
-  { name: "Allocation",  path: "/allocation",       icon: "▪", section: "main"    },
-  { name: "Mess",        path: "/mess",             icon: "🍽️", section: "main"    },
-  { name: "Fees",        path: "/fees",             icon: "₹",  section: "finance" },
-  { name: "Financial",   path: "/financial",        icon: "💰", section: "finance" },
-  { name: "Attendance",  path: "/attendance",       icon: "📅", section: "academic"},
-  { name: "Complaint",   path: "/complaint",        icon: "🔔", section: "academic"},
-  { name: "Maintenance", path: "/maintenance",      icon: "🔧", section: "academic"},
-  { name: "Visitors",    path: "/visitor",          icon: "👤", section: "academic"},
-  { name: "Notice",      path: "/notice",           icon: "📢", section: "reports" },
-  { name: "Reports",     path: "/reports",          icon: "▪", section: "reports" },
-  { name: "Analytics",   path: "/analytics",        icon: "📈", section: "reports" },
-  { name: "Profiles",    path: "/student-profiles", icon: "🪪", section: "reports" },
-  { name: "Events",      path: "/events",           icon: "🎉", section: "reports" },
+  { name: "Dashboard",   path: "/",                 icon: "🏠", section: "main"     },
+  { name: "Students",    path: "/students",         icon: "👥", section: "main"     },
+  { name: "Rooms",       path: "/rooms",            icon: "🚪", section: "main"     },
+  { name: "Allocation",  path: "/allocation",       icon: "▪",  section: "main"     },
+  { name: "Mess",        path: "/mess",             icon: "🍽️", section: "main"     },
+  { name: "Fees",        path: "/fees",             icon: "₹",  section: "finance"  },
+  { name: "Attendance",  path: "/attendance",       icon: "📅", section: "academic" },
+  { name: "Complaint",   path: "/complaint",        icon: "🔔", section: "academic" },
+  { name: "Maintenance", path: "/maintenance",      icon: "🔧", section: "academic" },
+  { name: "Visitors",    path: "/visitor",          icon: "👤", section: "academic" },
+  { name: "Notice",      path: "/notice",           icon: "📢", section: "reports"  },
+  { name: "Reports",     path: "/reports",          icon: "▪",  section: "reports"  },
+  { name: "Analytics",   path: "/analytics",        icon: "📈", section: "reports"  },
+  { name: "Profiles",    path: "/student-profiles", icon: "🪪", section: "reports"  },
+  { name: "Events",      path: "/events",           icon: "🎉", section: "reports"  },
 ];
 
 const sections = [
@@ -30,11 +30,22 @@ const sections = [
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, t: tProp, isDark: isDarkProp }) {
   const themeCtx = useContext(ThemeContext);
-  const t      = tProp      ?? themeCtx?.t      ?? { bg: "#020617", surface: "#0b1220", card: "#0f172a", border: "#1e293b", text: "#f8fafc", muted: "#94a3b8", accent: "#3b82f6" };
-  const isDark = isDarkProp ?? themeCtx?.isDark  ?? true;
+  const authCtx  = useContext(AuthContext);
 
-  const [hoveredPath, setHoveredPath] = useState(null);
-  const [tooltip, setTooltip]         = useState(null);
+  const t      = tProp     ?? themeCtx?.t     ?? { bg: "#020617", surface: "#0b1220", card: "#0f172a", border: "#1e293b", text: "#f8fafc", muted: "#94a3b8", accent: "#3b82f6" };
+  const isDark = isDarkProp ?? themeCtx?.isDark ?? true;
+
+  const user      = authCtx?.user;
+  const userName  = user?.name ?? "Guest";
+  const userRole  = user?.role ?? "guest";
+  const initials  = userName
+    .split(" ")
+    .map(n => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const [tooltip, setTooltip] = useState(null);
 
   return (
     <>
@@ -256,13 +267,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, t: tProp, isDark:
                       `hms-nav-link hms-sb-item${isActive ? " active" : ""}`
                     }
                     onMouseEnter={e => {
-                      setHoveredPath(item.path);
                       if (!sidebarOpen) {
                         const rect = e.currentTarget.getBoundingClientRect();
                         setTooltip({ label: item.name, y: rect.top + rect.height / 2 - 14 });
                       }
                     }}
-                    onMouseLeave={() => { setHoveredPath(null); setTooltip(null); }}
+                    onMouseLeave={() => { setTooltip(null); }}
                   >
                     {/* Icon */}
                     <span style={{
@@ -298,7 +308,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, t: tProp, isDark:
           })}
         </nav>
 
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
+        {/* ── Footer (real user, not hardcoded "Admin User") ─────────────── */}
         <div style={{
           borderTop:  `1px solid ${t.border}`,
           padding:    sidebarOpen ? "14px 16px" : "14px 8px",
@@ -314,14 +324,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, t: tProp, isDark:
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 12, fontWeight: 700,
           }}>
-            AD
+            {initials}
           </div>
           {sidebarOpen && (
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                Admin User
+                {userName}
               </div>
-              <div style={{ fontSize: 11, color: t.muted }}>👑 Administrator</div>
+              <div style={{ fontSize: 11, color: t.muted, textTransform: "capitalize" }}>
+                {userRole === "admin" ? "👑 Administrator" : userRole === "warden" ? "🛡️ Warden" : "🎓 Student"}
+              </div>
             </div>
           )}
         </div>

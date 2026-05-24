@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
-import { ThemeContext } from "../../context/ThemeContext";
+import { ThemeContext } from "../context/ThemeContext";
 
 export default function Layout({ children }) {
   const { t, isDark } = useContext(ThemeContext);
@@ -173,7 +173,7 @@ export default function Layout({ children }) {
           transition:     "background 0.3s, border-color 0.3s",
         }}>
           <span>🏠 Hostel Management System</span>
-          <span>© 2025 · All rights reserved</span>
+          <span>© {new Date().getFullYear()} · All rights reserved</span>
         </div>
       </div>
 

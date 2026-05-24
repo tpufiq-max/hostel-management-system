@@ -1,74 +1,512 @@
-import React, { useState, useEffect, useContext } from "react";
-import { ThemeContext } from "../context/ThemeContext";
+// Dashboard page
+// ──────────────────────────────────────────────────────────────────────────────
+// Real-data dashboard. Every number on this page comes from a live backend
+// query (GET /api/dashboard/stats); nothing is hard-coded.
+//
+// States:
+//   - loading       → skeleton shimmer
+//   - error         → recoverable error card with retry
+//   - empty         → friendly "no data yet" state
+//   - ready         → metric cards + occupancy donut + complaints summary
+//
+// Sections that previously showed fake "recent activities" / "notices" /
+// "sparklines" have been removed — there is no backend support for them
+// today, and showing fake numbers contradicts the whole point of this PR.
+// They will return in later PRs once the backend exposes the underlying
+// data (activity log, notices, time-series).
 
-function useCountUp(target, duration = 1400, start = false) {
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { ThemeContext } from "../context/ThemeContext";
+import { AuthContext } from "../context/AuthContext";
+import { getDashboardStats } from "../features/dashboard/dashboardService";
+
+// ── Tiny count-up helper ─────────────────────────────────────────────────────
+function useCountUp(target, duration = 1000, start = false) {
   const [val, setVal] = useState(0);
   useEffect(() => {
     if (!start) return;
-    let s = null;
-    const startTime = performance.now();
+    if (typeof target !== "number" || Number.isNaN(target)) {
+      setVal(0);
+      return;
+    }
+    let raf;
+    const t0 = performance.now();
     const tick = (now) => {
-      const p = Math.min((now - startTime) / duration, 1);
+      const p = Math.min((now - t0) / duration, 1);
       const ease = 1 - Math.pow(1 - p, 3);
       setVal(Math.round(ease * target));
-      if (p < 1) s = requestAnimationFrame(tick);
+      if (p < 1) raf = requestAnimationFrame(tick);
     };
-    s = requestAnimationFrame(tick);
-    return () => s && cancelAnimationFrame(s);
+    raf = requestAnimationFrame(tick);
+    return () => raf && cancelAnimationFrame(raf);
   }, [target, duration, start]);
   return val;
 }
 
-function MiniSparkline({ data, color, width = 80, height = 32 }) {
-  const max = Math.max(...data), min = Math.min(...data);
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((v - min) / (max - min || 1)) * (height - 4) - 2;
-    return `${x},${y}`;
-  }).join(" ");
-  const last = pts.split(" ").pop().split(",");
-  return (
-    <svg width={width} height={height} style={{ overflow: "visible" }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last[0]} cy={last[1]} r="3" fill={color} />
-    </svg>
-  );
-}
-
-function DonutChart({ segments, t }) {
-  const total = segments.reduce((a, s) => a + s.value, 0) || 1;
+// ── Donut chart (occupied vs available rooms) ────────────────────────────────
+function DonutChart({ occupied, available, t }) {
+  const total = (occupied || 0) + (available || 0);
+  const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
   const r = 44, cx = 54, cy = 54, stroke = 12;
   const circ = 2 * Math.PI * r;
-  let offset = circ * 0.25;
+  const occArc = total > 0 ? (occupied / total) * circ : 0;
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <svg width={108} height={108}>
+        {/* Background ring */}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={t.border} strokeWidth={stroke} />
-        {segments.map((seg, i) => {
-          const arc = (seg.value / total) * circ;
-          const el = (
-            <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-              stroke={seg.color} strokeWidth={stroke}
-              strokeDasharray={`${arc} ${circ}`}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              style={{ transition: "stroke-dasharray 1s ease" }}
-            />
-          );
-          offset += arc;
-          return el;
-        })}
-        <text x={cx} y={cy - 4} textAnchor="middle" fill={t.text} fontSize={16} fontWeight={700}>
-          {Math.round((segments[0]?.value / total) * 100)}%
-        </text>
+        {/* Occupied arc */}
+        <circle
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke={t.accent}
+          strokeWidth={stroke}
+          strokeDasharray={`${occArc} ${circ}`}
+          strokeDashoffset={circ * 0.25}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 0.6s ease" }}
+        />
+        <text x={cx} y={cy - 2} textAnchor="middle" fill={t.text} fontSize={18} fontWeight={700}>{pct}%</text>
         <text x={cx} y={cy + 14} textAnchor="middle" fill={t.muted} fontSize={9}>occupied</text>
       </svg>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {segments.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color }} />
-            <span style={{ color: t.muted }}>{s.label}</span>
-            <strong style={{ color: s.color, marginLeft: "auto", paddingLeft: 8 }}>{s.value}</strong>
+        <LegendRow color={t.accent}  label="Occupied"  value={occupied} />
+        <LegendRow color={t.success} label="Available" value={available} />
+        <LegendRow color={t.muted}   label="Total"     value={total} subtle />
+      </div>
+    </div>
+  );
+}
+
+function LegendRow({ color, label, value, subtle = false }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+      <span style={{ color: "var(--muted)" }}>{label}</span>
+      <strong style={{ marginLeft: "auto", paddingLeft: 12, color: subtle ? "var(--muted)" : color }}>
+        {Number(value || 0).toLocaleString()}
+      </strong>
+    </div>
+  );
+}
+
+// ── Number formatting helpers ────────────────────────────────────────────────
+const formatINR = (value) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+const formatNumber = (value) =>
+  new Intl.NumberFormat("en-IN").format(Number(value || 0));
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+export default function Dashboard() {
+  const themeCtx = useContext(ThemeContext);
+  const authCtx  = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  // The themes provider always supplies these, but defaulting keeps the page
+  // resilient if Dashboard is rendered outside the layout (e.g. in tests).
+  const t = themeCtx?.t ?? {
+    bg: "#020617", surface: "#0b1220", card: "#0f172a", border: "#1e293b",
+    text: "#f8fafc", muted: "#94a3b8", accent: "#3b82f6",
+    success: "#22c55e", danger: "#f87171", warning: "#fbbf24", purple: "#a855f7",
+  };
+
+  const [stats, setStats]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [animateIn, setAnimateIn]   = useState(false);
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (silent) setRefreshing(true); else setLoading(true);
+    setError(null);
+    try {
+      const data = await getDashboardStats();
+      setStats(data);
+      // Trigger count-up animation on the next frame
+      setTimeout(() => setAnimateIn(true), 50);
+    } catch (err) {
+      setError(err?.message || "Could not load dashboard data.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loading) {
+    return <DashboardSkeleton t={t} />;
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────────
+  if (error) {
+    return <DashboardError t={t} message={error} onRetry={() => load()} />;
+  }
+
+  // ── Empty state (genuinely no data — fresh DB) ─────────────────────────────
+  if (
+    stats &&
+    stats.totalStudents === 0 &&
+    stats.totalRooms === 0 &&
+    stats.totalComplaints === 0
+  ) {
+    return <DashboardEmpty t={t} navigate={navigate} />;
+  }
+
+  return (
+    <DashboardReady
+      t={t}
+      stats={stats}
+      animateIn={animateIn}
+      refreshing={refreshing}
+      onRefresh={() => load({ silent: true })}
+      userName={authCtx?.user?.name}
+    />
+  );
+}
+
+// ── Subcomponents ────────────────────────────────────────────────────────────
+
+function DashboardReady({ t, stats, animateIn, refreshing, onRefresh, userName }) {
+  const navigate = useNavigate();
+
+  // Count-up animations for the four headline metrics
+  const cStudents = useCountUp(stats.totalStudents,    900, animateIn);
+  const cRooms    = useCountUp(stats.occupiedRooms,    900, animateIn);
+  const cRevenue  = useCountUp(Math.round(stats.totalRevenue),    1100, animateIn);
+  const cPending  = useCountUp(Math.round(stats.pendingPayments), 900, animateIn);
+
+  const occupancyPct = Math.round(stats.occupancyRate || 0);
+  const resolvedPct  = stats.totalComplaints > 0
+    ? Math.round((stats.resolvedComplaints / stats.totalComplaints) * 100)
+    : 0;
+
+  const cards = [
+    {
+      label:    "Total Students",
+      value:    formatNumber(cStudents),
+      subline:  `${formatNumber(stats.activeStudents)} active`,
+      icon:     "👥",
+      color:    t.accent,
+      onClick:  () => navigate("/students"),
+    },
+    {
+      label:    "Room Occupancy",
+      value:    `${formatNumber(cRooms)} / ${formatNumber(stats.totalRooms)}`,
+      subline:  `${occupancyPct}% occupied`,
+      icon:     "🚪",
+      color:    t.success,
+      onClick:  () => navigate("/rooms"),
+    },
+    {
+      label:    "Total Revenue",
+      value:    formatINR(cRevenue),
+      subline:  "Lifetime collected",
+      icon:     "💰",
+      color:    t.purple,
+      onClick:  () => navigate("/fees"),
+    },
+    {
+      label:    "Pending Payments",
+      value:    formatINR(cPending),
+      subline:  "Pending or overdue",
+      icon:     "⚠️",
+      color:    t.danger,
+      onClick:  () => navigate("/fees"),
+    },
+  ];
+
+  return (
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif", color: t.text }}>
+      <style>{`
+        @keyframes hms-slide-up { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        .hms-card-tile {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 20px;
+          position: relative;
+          overflow: hidden;
+          cursor: pointer;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .hms-card-tile:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+        }
+        .hms-section-card {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 20px;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 24,
+        flexWrap: "wrap",
+        gap: 12,
+        animation: "hms-slide-up 0.4s ease both",
+      }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>Dashboard</h1>
+          <p style={{ fontSize: 13, color: t.muted, margin: "4px 0 0" }}>
+            {userName ? `Welcome back, ${userName.split(" ")[0]}.` : "Welcome back."}
+            {" "}Live overview of your hostel — refreshed from the database.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label="Refresh dashboard data"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: `1px solid ${t.border}`,
+            background: t.surface,
+            color: refreshing ? t.muted : t.text,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: refreshing ? "wait" : "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span style={{
+            display: "inline-block",
+            animation: refreshing ? "hms-spin 0.8s linear infinite" : "none",
+          }}>↻</span>
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
+        <style>{`@keyframes hms-spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+
+      {/* Stat tiles */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 16,
+        marginBottom: 24,
+      }}>
+        {cards.map((card, i) => (
+          <div
+            key={card.label}
+            className="hms-card-tile"
+            style={{ animation: `hms-slide-up 0.45s ease ${i * 0.05}s both` }}
+            onClick={card.onClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && card.onClick()}
+          >
+            {/* Decorative corner */}
+            <div style={{
+              position: "absolute",
+              top: 0, right: 0,
+              width: 72, height: 72,
+              background: `${card.color}1a`,
+              borderRadius: "0 16px 0 72px",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "flex-end",
+              paddingRight: 12,
+              paddingTop: 12,
+              fontSize: 22,
+            }}>{card.icon}</div>
+
+            <div style={{
+              fontSize: 11,
+              color: t.muted,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              marginBottom: 6,
+            }}>
+              {card.label}
+            </div>
+            <div style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: card.color,
+              letterSpacing: -1,
+              marginBottom: 4,
+            }}>
+              {card.value}
+            </div>
+            <div style={{ fontSize: 11, color: t.muted }}>
+              {card.subline}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Lower row: occupancy + complaints */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 20,
+      }}>
+        {/* Occupancy */}
+        <div className="hms-section-card" style={{ animation: "hms-slide-up 0.5s ease 0.2s both" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Room Occupancy</h3>
+            <button
+              type="button"
+              onClick={() => navigate("/rooms")}
+              style={{ background: "none", border: "none", color: t.accent, fontSize: 12, cursor: "pointer" }}
+            >
+              View rooms →
+            </button>
+          </div>
+
+          {stats.totalRooms === 0 ? (
+            <p style={{ color: t.muted, fontSize: 13, margin: 0 }}>
+              No rooms yet. Add rooms in the Rooms section to see occupancy.
+            </p>
+          ) : (
+            <DonutChart
+              occupied={stats.occupiedRooms}
+              available={stats.totalRooms - stats.occupiedRooms}
+              t={t}
+            />
+          )}
+        </div>
+
+        {/* Complaints */}
+        <div className="hms-section-card" style={{ animation: "hms-slide-up 0.5s ease 0.25s both" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Complaints</h3>
+            <button
+              type="button"
+              onClick={() => navigate("/complaint")}
+              style={{ background: "none", border: "none", color: t.accent, fontSize: 12, cursor: "pointer" }}
+            >
+              View all →
+            </button>
+          </div>
+
+          {stats.totalComplaints === 0 ? (
+            <p style={{ color: t.muted, fontSize: 13, margin: 0 }}>
+              No complaints yet. The system is quiet — that's a good sign.
+            </p>
+          ) : (
+            <>
+              <ComplaintRow label="Total"    value={stats.totalComplaints}    color={t.accent} />
+              <ComplaintRow label="Resolved" value={stats.resolvedComplaints} color={t.success} />
+              <ComplaintRow label="Open"     value={stats.openComplaints}     color={t.danger} />
+
+              <div style={{ marginTop: 14 }}>
+                <div style={{
+                  height: 6,
+                  background: t.border,
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${resolvedPct}%`,
+                    background: t.success,
+                    borderRadius: 4,
+                    transition: "width 0.6s ease",
+                  }} />
+                </div>
+                <div style={{ fontSize: 11, color: t.muted, textAlign: "right", marginTop: 6 }}>
+                  {resolvedPct}% resolved
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComplaintRow({ label, value, color }) {
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "8px 0",
+      borderBottom: "1px solid var(--border)",
+    }}>
+      <span style={{ fontSize: 13, color: "var(--muted)" }}>{label}</span>
+      <strong style={{ fontSize: 14, color }}>{formatNumber(value)}</strong>
+    </div>
+  );
+}
+
+// ── Loading skeleton ─────────────────────────────────────────────────────────
+function DashboardSkeleton({ t }) {
+  return (
+    <div style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes hms-shimmer { 0% { opacity: 0.5; } 50% { opacity: 0.85; } 100% { opacity: 0.5; } }
+        .hms-skeleton {
+          background: var(--border);
+          border-radius: 8px;
+          animation: hms-shimmer 1.4s ease-in-out infinite;
+        }
+      `}</style>
+
+      <div style={{ marginBottom: 24 }}>
+        <div className="hms-skeleton" style={{ height: 28, width: 200, marginBottom: 8 }} />
+        <div className="hms-skeleton" style={{ height: 14, width: 320 }} />
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 16,
+        marginBottom: 24,
+      }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{
+            background: t.surface,
+            border: `1px solid ${t.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}>
+            <div className="hms-skeleton" style={{ height: 11, width: "50%", marginBottom: 14 }} />
+            <div className="hms-skeleton" style={{ height: 28, width: "70%", marginBottom: 8 }} />
+            <div className="hms-skeleton" style={{ height: 10, width: "40%" }} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 20,
+      }}>
+        {[0, 1].map(i => (
+          <div key={i} style={{
+            background: t.surface,
+            border: `1px solid ${t.border}`,
+            borderRadius: 16,
+            padding: 20,
+            minHeight: 180,
+          }}>
+            <div className="hms-skeleton" style={{ height: 16, width: "40%", marginBottom: 18 }} />
+            <div className="hms-skeleton" style={{ height: 12, width: "100%", marginBottom: 8 }} />
+            <div className="hms-skeleton" style={{ height: 12, width: "85%", marginBottom: 8 }} />
+            <div className="hms-skeleton" style={{ height: 12, width: "60%" }} />
           </div>
         ))}
       </div>
@@ -76,286 +514,119 @@ function DonutChart({ segments, t }) {
   );
 }
 
-const mockStats = {
-  totalStudents: 245, activeStudents: 238,
-  totalRooms: 120, occupiedRooms: 115,
-  totalRevenue: 125000, pendingPayments: 8500,
-  totalComplaints: 23, resolvedComplaints: 18,
-};
-
-const mockActivities = [
-  { id: 1, icon: "👤", action: "New student registered",  details: "John Doe joined Room 101",       time: "2h ago", color: "#3b82f6" },
-  { id: 2, icon: "💰", action: "Payment received",        details: "₹2,500 from Jane Smith",         time: "4h ago", color: "#22c55e" },
-  { id: 3, icon: "✓", action: "Complaint resolved",      details: "Room maintenance issue fixed",   time: "6h ago", color: "#22c55e" },
-  { id: 4, icon: "📝", action: "Attendance marked",       details: "Evening attendance completed",   time: "8h ago", color: "#f59e0b" },
-  { id: 5, icon: "📢", action: "New notice posted",       details: "Hostel rules updated",           time: "1d ago", color: "#a855f7" },
-];
-
-const notices = [
-  { id: 1, title: "Hostel Maintenance Schedule", date: "Today",       message: "Electrical maintenance in Block A from 2–4 PM. Please cooperate.",         priority: "high"   },
-  { id: 2, title: "Fee Payment Deadline",        date: "Tomorrow",    message: "Monthly fee deadline approaching. Pay before 25th to avoid late fees.",      priority: "medium" },
-  { id: 3, title: "Sports Event Registration",   date: "25 Feb 2025", message: "Inter-hostel cricket tournament registration open. Register by 28th Feb.", priority: "low"    },
-];
-
-const quickActions = [
-  { title: "Mark Attendance", icon: "📝", color: "#22c55e" },
-  { title: "Record Payment",  icon: "💰", color: "#a855f7" },
-  { title: "View Reports",    icon: "▪", color: "#f59e0b" },
-  { title: "Manage Rooms",    icon: "🏠", color: "#3b82f6" },
-];
-
-export default function Dashboard() {
-  const themeCtx = useContext(ThemeContext);
-  const t = themeCtx?.t ?? {
-    bg: "#020617", surface: "#0b1220", card: "#0f172a", border: "#1e293b",
-    text: "#f8fafc", muted: "#94a3b8", accent: "#3b82f6",
-    success: "#22c55e", danger: "#f87171", warning: "#fbbf24",
-    gold: "#f59e0b", purple: "#a855f7",
-  };
-
-  const [stats, setStats]                       = useState(null);
-  const [activities, setActivities]             = useState([]);
-  const [loading, setLoading]                   = useState(true);
-  const [started, setStarted]                   = useState(false);
-  const [period, setPeriod]                     = useState("Month");
-  const [activeTab, setActiveTab]               = useState("overview");
-  const [time, setTime]                         = useState(new Date());
-  const [expandedActivity, setExpandedActivity] = useState(null);
-
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    const load = async () => {
-      await new Promise(r => setTimeout(r, 900));
-      setStats(mockStats);
-      setActivities(mockActivities);
-      setLoading(false);
-      setTimeout(() => setStarted(true), 100);
-    };
-    load();
-  }, []);
-
-  const cStudents = useCountUp(stats?.totalStudents   ?? 0, 1400, started);
-  const cRooms    = useCountUp(stats?.occupiedRooms   ?? 0, 1400, started);
-  const cRevenue  = useCountUp(stats?.totalRevenue    ?? 0, 1600, started);
-  const cPending  = useCountUp(stats?.pendingPayments ?? 0, 1400, started);
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <div style={{ width: 44, height: 44, border: `3px solid ${t.border}`, borderTop: `3px solid ${t.accent}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-        <div style={{ color: t.muted, fontSize: 14 }}>Loading dashboard...</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  const occupancyPct      = Math.round((stats.occupiedRooms / stats.totalRooms) * 100);
-  const resolvedPct       = Math.round((stats.resolvedComplaints / stats.totalComplaints) * 100);
-  const pendingComplaints = stats.totalComplaints - stats.resolvedComplaints;
-  const priorityColor     = (p) => p === "high" ? t.danger : p === "medium" ? t.warning : t.accent;
-
-  const statCards = [
-    { label: "Total Students",    val: cStudents,                  icon: "👥", color: t.accent,  bg: `${t.accent}18`,  change: "+12% from last month",  trend: "up",   spark: [180,195,200,210,220,230,238,242,245] },
-    { label: "Room Occupancy",    val: `${cRooms}/${stats.totalRooms}`, icon: "🚪", color: t.success, bg: `${t.success}18`, change: `${occupancyPct}% occupied`, trend: "up",   spark: [90,95,98,100,105,108,110,113,115]   },
-    { label: "Monthly Revenue",   val: `₹${cRevenue.toLocaleString()}`, icon: "💰", color: t.purple,  bg: `${t.purple}18`,  change: "+8% from last month",   trend: "up",   spark: [90000,95000,100000,105000,110000,115000,120000,122000,125000] },
-    { label: "Pending Payments",  val: `₹${cPending.toLocaleString()}`, icon: "⚠️", color: t.danger,  bg: `${t.danger}18`,  change: "5 students pending",    trend: "warn", spark: [12000,11000,10500,10000,9500,9000,8800,8600,8500] },
-  ];
-
+// ── Error state ──────────────────────────────────────────────────────────────
+function DashboardError({ t, message, onRetry }) {
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif", color: t.text }}>
-      <style>{`
-        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
-        @keyframes spin    { to { transform:rotate(360deg); } }
-        * { box-sizing: border-box; }
-      `}</style>
+    <div style={{
+      minHeight: "60vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "column",
+      gap: 16,
+      padding: 24,
+      textAlign: "center",
+    }}>
+      <div style={{
+        width: 64,
+        height: 64,
+        borderRadius: "50%",
+        background: `${t.danger}1a`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 28,
+      }}>⚠️</div>
+      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: t.text }}>
+        Couldn't load the dashboard
+      </h2>
+      <p style={{ fontSize: 13, color: t.muted, margin: 0, maxWidth: 420 }}>
+        {message}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          padding: "10px 20px",
+          borderRadius: 10,
+          border: "none",
+          background: t.accent,
+          color: "#fff",
+          fontWeight: 600,
+          fontSize: 13,
+          cursor: "pointer",
+        }}
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
 
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 12, animation: "slideUp 0.5s ease both" }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: t.text, letterSpacing: -0.5 }}>🏠 Dashboard</div>
-          <div style={{ fontSize: 13, color: t.muted, marginTop: 4 }}>Welcome back! Here's what's happening in your hostel today.</div>
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: 3, gap: 2 }}>
-            {["Week","Month","Year"].map(p => (
-              <button key={p} onClick={() => setPeriod(p)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: period === p ? t.accent : "transparent", color: period === p ? "#fff" : t.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}>{p}</button>
-            ))}
-          </div>
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "8px 14px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.accent, fontVariantNumeric: "tabular-nums" }}>
-              {time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </div>
-            <div style={{ fontSize: 10, color: t.muted }}>
-              {time.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
-            </div>
-          </div>
-        </div>
+// ── Empty state ──────────────────────────────────────────────────────────────
+function DashboardEmpty({ t, navigate }) {
+  return (
+    <div style={{
+      minHeight: "60vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "column",
+      gap: 14,
+      padding: 24,
+      textAlign: "center",
+    }}>
+      <div style={{
+        width: 64,
+        height: 64,
+        borderRadius: "50%",
+        background: `${t.accent}1a`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 28,
+      }}>🏠</div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: t.text }}>
+        Your hostel is ready to go
+      </h2>
+      <p style={{ fontSize: 13, color: t.muted, margin: 0, maxWidth: 460, lineHeight: 1.6 }}>
+        There&apos;s nothing in the database yet. Add your first rooms and students,
+        and the dashboard will start showing real numbers automatically.
+      </p>
+      <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={() => navigate("/rooms")}
+          style={{
+            padding: "10px 20px",
+            borderRadius: 10,
+            border: "none",
+            background: t.accent,
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          Add rooms
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate("/students")}
+          style={{
+            padding: "10px 20px",
+            borderRadius: 10,
+            border: `1px solid ${t.border}`,
+            background: t.surface,
+            color: t.text,
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          Add students
+        </button>
       </div>
-
-      {/* Stat Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 24 }}>
-        {statCards.map((card, i) => (
-          <div key={card.label}
-            style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, position: "relative", overflow: "hidden", transition: "transform 0.2s, box-shadow 0.2s", animation: `slideUp 0.5s ease ${i * 0.08}s both`, cursor: "default" }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${card.color}22`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-          >
-            <div style={{ position: "absolute", top: 0, right: 0, width: 72, height: 72, background: card.bg, borderRadius: "0 16px 0 72px", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 12, paddingTop: 12, fontSize: 22 }}>{card.icon}</div>
-            <div style={{ fontSize: 11, color: t.muted, marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{card.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: card.color, letterSpacing: -1, marginBottom: 4 }}>{card.val}</div>
-            <div style={{ fontSize: 11, color: card.trend === "up" ? t.success : card.trend === "warn" ? t.warning : t.danger, marginBottom: 10 }}>
-              {card.trend === "up" ? "↑" : "⚠"} {card.change}
-            </div>
-            <MiniSparkline data={card.spark} color={card.color} />
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 2, marginBottom: 20, background: t.surface, borderRadius: 12, padding: 4, width: "fit-content", border: `1px solid ${t.border}` }}>
-        {["overview","activities","notices"].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: activeTab === tab ? t.accent : "transparent", color: activeTab === tab ? "#fff" : t.muted, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.2s", textTransform: "capitalize" }}>{tab}</button>
-        ))}
-      </div>
-
-      {/* Overview Tab */}
-      {activeTab === "overview" && (
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, animation: "slideIn 0.3s ease" }}>
-          {/* Activities */}
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: t.text }}>Recent Activities</h3>
-              <button onClick={() => setActiveTab("activities")} style={{ fontSize: 12, color: t.accent, background: "none", border: "none", cursor: "pointer" }}>View all →</button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {activities.map((a, i) => (
-                <div key={a.id} onClick={() => setExpandedActivity(expandedActivity === a.id ? null : a.id)}
-                  style={{ background: t.card, border: `1px solid ${expandedActivity === a.id ? t.accent : t.border}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", transition: "all 0.2s", animation: `slideIn 0.3s ease ${i * 0.05}s both` }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = t.accent}
-                  onMouseLeave={e => { if (expandedActivity !== a.id) e.currentTarget.style.borderColor = t.border; }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `${a.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{a.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{a.action}</div>
-                      <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{a.details}</div>
-                    </div>
-                    <span style={{ fontSize: 11, color: t.muted, whiteSpace: "nowrap" }}>{a.time}</span>
-                  </div>
-                  {expandedActivity === a.id && (
-                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.border}`, fontSize: 12, color: t.muted, display: "flex", gap: 16 }}>
-                      <span>Type: <strong style={{ color: a.color }}>Activity</strong></span>
-                      <span>Time: <strong style={{ color: t.text }}>{a.time}</strong></span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-            {/* Quick Actions */}
-            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px", color: t.text }}>Quick Actions</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {quickActions.map((qa, i) => (
-                  <button key={i} style={{ padding: "14px 10px", borderRadius: 12, border: `1px solid ${qa.color}33`, background: `${qa.color}11`, cursor: "pointer", transition: "all 0.2s", textAlign: "center" }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${qa.color}33`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-                  >
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>{qa.icon}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: qa.color }}>{qa.title}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Room Donut */}
-            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px", color: t.text }}>Room Overview</h3>
-              <DonutChart segments={[
-                { label: "Occupied",  value: stats.occupiedRooms,                   color: t.accent  },
-                { label: "Available", value: stats.totalRooms - stats.occupiedRooms, color: t.success },
-              ]} t={t} />
-            </div>
-
-            {/* Complaints */}
-            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 14px", color: t.text }}>Complaints Status</h3>
-              {[
-                { label: "Total",    val: stats.totalComplaints,    color: t.accent  },
-                { label: "Resolved", val: stats.resolvedComplaints, color: t.success },
-                { label: "Pending",  val: pendingComplaints,        color: t.danger  },
-              ].map(row => (
-                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${t.border}55` }}>
-                  <span style={{ fontSize: 13, color: t.muted }}>{row.label}</span>
-                  <strong style={{ fontSize: 14, color: row.color }}>{row.val}</strong>
-                </div>
-              ))}
-              <div style={{ marginTop: 12, height: 6, background: t.border, borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${resolvedPct}%`, background: t.success, borderRadius: 4, transition: "width 1s ease" }} />
-              </div>
-              <div style={{ fontSize: 11, color: t.muted, marginTop: 4, textAlign: "right" }}>{resolvedPct}% resolved</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Activities Tab */}
-      {activeTab === "activities" && (
-        <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 20, animation: "slideIn 0.3s ease" }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px", color: t.text }}>All Activities</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {activities.map((a, i) => (
-              <div key={a.id}
-                style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, animation: `slideIn 0.25s ease ${i * 0.04}s both`, transition: "border-color 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = t.accent}
-                onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
-              >
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${a.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{a.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{a.action}</div>
-                  <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{a.details}</div>
-                </div>
-                <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 6, background: `${a.color}22`, color: a.color, fontWeight: 600, whiteSpace: "nowrap" }}>{a.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Notices Tab */}
-      {activeTab === "notices" && (
-        <div style={{ animation: "slideIn 0.3s ease" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: t.text }}>📢 Important Notices</h3>
-            <span style={{ fontSize: 12, background: `${t.warning}22`, color: t.warning, padding: "3px 10px", borderRadius: 6, fontWeight: 600 }}>{notices.length} notices</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-            {notices.map((n, i) => (
-              <div key={n.id}
-                style={{ background: t.surface, border: `1px solid ${t.border}`, borderLeft: `4px solid ${priorityColor(n.priority)}`, borderRadius: 14, padding: 18, animation: `slideUp 0.3s ease ${i * 0.08}s both`, transition: "transform 0.2s, box-shadow 0.2s" }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 8px 24px ${priorityColor(n.priority)}22`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: t.text, flex: 1, paddingRight: 8 }}>{n.title}</div>
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: `${priorityColor(n.priority)}22`, color: priorityColor(n.priority), fontWeight: 700, flexShrink: 0, textTransform: "capitalize" }}>{n.priority}</span>
-                </div>
-                <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginBottom: 10 }}>{n.message}</div>
-                <div style={{ fontSize: 11, color: t.muted }}>📅 {n.date}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

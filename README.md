@@ -48,8 +48,37 @@ A modern, responsive web application for managing hostel operations built with R
 
 ### Demo Credentials
 
-- **Email**: admin@hostel.com
-- **Password**: admin123
+The system no longer ships with demo data. On first startup, an initial
+administrator account is created automatically so you can sign in and begin
+entering real data.
+
+**Default bootstrap admin (development only):**
+
+- Email: `admin@hostel.local`
+- Password: `ChangeMe@123`
+
+> Change this password immediately after first login.
+
+**Override the bootstrap admin** via environment variables or
+`application.properties`:
+
+```
+APP_BOOTSTRAP_ADMIN_EMAIL=youradmin@yourdomain.com
+APP_BOOTSTRAP_ADMIN_PASSWORD=YourStrongPassword!
+APP_BOOTSTRAP_ADMIN_NAME="Hostel Warden"
+APP_BOOTSTRAP_ADMIN_USERNAME=warden
+APP_BOOTSTRAP_ADMIN_PHONE=9876543210
+```
+
+**Disable bootstrap** entirely (recommended for production once the admin
+exists):
+
+```
+APP_BOOTSTRAP_ADMIN_ENABLED=false
+```
+
+All students, rooms, fees, attendance, complaints, etc. are added through
+the application UI — nothing is pre-seeded.
 
 ## Project Structure
 

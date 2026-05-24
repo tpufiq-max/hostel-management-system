@@ -3,7 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hostel Management</title>
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Hostel Management System — administration dashboard for hostels and student housing." />
+    <title>Hostel Management System</title>
+    <!--
+      Set the dark class synchronously, before React hydrates, so we never
+      flash light theme to a dark-mode user on first paint.
+      Mirrors the logic in context/ThemeContext.jsx#getInitialTheme.
+    -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("hms_theme");
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var isDark = saved ? saved === "dark" : prefersDark || true;
+          if (isDark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          /* localStorage unavailable — default to dark */
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

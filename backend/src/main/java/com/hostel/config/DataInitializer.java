@@ -1,116 +1,142 @@
 package com.hostel.config;
 
-import com.hostel.entity.*;
-import com.hostel.repository.*;
+import com.hostel.entity.User;
+import com.hostel.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.LocalDate;
-import java.util.Objects;
-
+/**
+ * Bootstraps the initial administrator account on first startup so the
+ * application is usable out of the box. No demo students, rooms, fees, or
+ * student users are seeded — all real data is entered through the application.
+ *
+ * <p>The bootstrap admin is only created when:
+ * <ol>
+ *   <li>{@code app.bootstrap.admin.enabled=true} (default true), AND</li>
+ *   <li>No user with the configured bootstrap email exists.</li>
+ * </ol>
+ *
+ * <p>Override defaults via environment variables (recommended for production):
+ * <pre>
+ *   APP_BOOTSTRAP_ADMIN_ENABLED
+ *   APP_BOOTSTRAP_ADMIN_EMAIL
+ *   APP_BOOTSTRAP_ADMIN_PASSWORD
+ *   APP_BOOTSTRAP_ADMIN_NAME
+ *   APP_BOOTSTRAP_ADMIN_USERNAME
+ *   APP_BOOTSTRAP_ADMIN_PHONE
+ * </pre>
+ *
+ * <p>After the first login, change the admin password and set
+ * {@code APP_BOOTSTRAP_ADMIN_ENABLED=false} in production.
+ */
 @Configuration
 public class DataInitializer {
 
-    @Bean
-    CommandLineRunner initData(
-            UserRepository userRepository,
-            StudentRepository studentRepository,
-            RoomRepository roomRepository,
-            PasswordEncoder passwordEncoder) {
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
+    @Value("${app.bootstrap.admin.enabled:true}")
+    private boolean bootstrapEnabled;
+
+    @Value("${app.bootstrap.admin.email:admin@hostel.local}")
+    private String adminEmail;
+
+    @Value("${app.bootstrap.admin.password:ChangeMe@123}")
+    private String adminPassword;
+
+    @Value("${app.bootstrap.admin.name:Administrator}")
+    private String adminName;
+
+    @Value("${app.bootstrap.admin.username:admin}")
+    private String adminUsername;
+
+    @Value("${app.bootstrap.admin.phone:0000000000}")
+    private String adminPhone;
+
+    @Bean
+    CommandLineRunner initData(UserRepository userRepository,
+                               PasswordEncoder passwordEncoder,
+                               Environment env) {
         return args -> {
             try {
-                // ── Admin user ──────────────────────────────────────────
-                if (!userRepository.existsByEmail("admin@hostel.com")) {
-                    userRepository.save(Objects.requireNonNull(User.builder()
-                            .name("Admin User")
-                            .username("admin")
-                            .email("admin@hostel.com")
-                            .password(passwordEncoder.encode("admin123"))
-                            .role(User.Role.ADMIN)
-                            .phone("9876543210")
-                            .isActive(true)
-                            .build()));
-                    System.out.println("✓ Admin user created");
-                }
-
-                // ── Student user ────────────────────────────────────────
-                if (!userRepository.existsByEmail("student@hostel.com")) {
-                    userRepository.save(Objects.requireNonNull(User.builder()
-                            .name("John Doe")
-                            .username("johndoe")
-                            .email("student@hostel.com")
-                            .password(passwordEncoder.encode("student123"))
-                            .role(User.Role.STUDENT)
-                            .phone("9876543211")
-                            .isActive(true)
-                            .build()));
-                    System.out.println("✓ Student user created");
-                }
-
-                // ── Sample rooms ────────────────────────────────────────
-                if (roomRepository.count() == 0) {
-                    for (int floor = 1; floor <= 3; floor++) {
-                        for (int room = 1; room <= 5; room++) {
-                            String roomNumber = floor + String.format("%02d", room);
-                            roomRepository.save(Objects.requireNonNull(Room.builder()
-                                    .roomNumber(roomNumber)
-                                    .capacity(room <= 3 ? 2 : 3)
-                                    .occupied(0)
-                                    .block("A")
-                                    .floor(floor)
-                                    .type(room <= 3 ? Room.RoomType.DOUBLE : Room.RoomType.TRIPLE)
-                                    .status(Room.RoomStatus.AVAILABLE)
-                                    .monthlyRent(room <= 3 ? 5000.0 : 4000.0)
-                                    .amenities("WiFi, AC, Attached Bathroom")
-                                    .build()));
-                        }
-                    }
-                    System.out.println("✓ Sample rooms created");
-                }
-
-                // ── Sample students ─────────────────────────────────────
-                if (studentRepository.count() == 0) {
-                    String[][] data = {
-                        {"John Doe",    "B.Tech CSE", "Engineering", "Male"},
-                        {"Jane Smith",  "B.Tech ECE", "Engineering", "Female"},
-                        {"Mike Johnson","B.Tech ME",  "Engineering", "Male"},
-                        {"Emily Davis", "BBA",        "Management",  "Female"},
-                        {"Chris Wilson","B.Sc Physics","Science",    "Male"},
-                    };
-                    for (int i = 0; i < data.length; i++) {
-                        studentRepository.save(Objects.requireNonNull(Student.builder()
-                                .name(data[i][0])
-                                .email(data[i][0].toLowerCase().replace(" ", ".") + "@student.hostel.com")
-                                .phone("98765432" + (10 + i))
-                                .rollNumber("2024" + String.format("%03d", i + 1))
-                                .course(data[i][1])
-                                .department(data[i][2])
-                                .year(2)
-                                .roomNumber("1" + String.format("%02d", i + 1))
-                                .gender(data[i][3])
-                                .feesStatus(i < 3 ? Student.FeesStatus.PAID : Student.FeesStatus.PENDING)
-                                .isActive(true)
-                                .admissionDate(LocalDate.of(2024, 7, 1))
-                                .build()));
-                    }
-                    System.out.println("✓ Sample students created");
-                }
-
-                System.out.println("==========================================");
-                System.out.println("🏠 HMS Backend Ready!");
-                System.out.println("   URL  : http://localhost:8080");
-                System.out.println("   H2   : http://localhost:8080/h2-console");
-                System.out.println("   Admin: admin@hostel.com / admin123");
-                System.out.println("   Student: student@hostel.com / student123");
-                System.out.println("==========================================");
-
+                bootstrapAdminIfNeeded(userRepository, passwordEncoder);
+                printStartupBanner(env);
             } catch (Exception e) {
-                System.err.println("⚠️ DataInitializer error (non-fatal): " + e.getMessage());
-                // Don't crash the app — tables may not exist yet on first run
+                // Non-fatal: schema may not be ready on the very first run.
+                log.error("DataInitializer failed (non-fatal): {}", e.getMessage(), e);
             }
         };
+    }
+
+    private void bootstrapAdminIfNeeded(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        if (!bootstrapEnabled) {
+            log.info("Bootstrap admin disabled (app.bootstrap.admin.enabled=false). Skipping.");
+            return;
+        }
+        if (userRepository.existsByEmail(adminEmail)) {
+            log.info("Bootstrap admin '{}' already exists. Skipping.", adminEmail);
+            return;
+        }
+
+        User admin = User.builder()
+                .name(adminName)
+                .username(adminUsername)
+                .email(adminEmail)
+                .password(passwordEncoder.encode(adminPassword))
+                .role(User.Role.ADMIN)
+                .phone(adminPhone)
+                .isActive(true)
+                .build();
+
+        userRepository.save(admin);
+
+        log.warn("===========================================================");
+        log.warn(" Initial admin account created: {}", adminEmail);
+        log.warn(" CHANGE THE PASSWORD IMMEDIATELY after first login.");
+        log.warn(" In production, set APP_BOOTSTRAP_ADMIN_ENABLED=false once");
+        log.warn(" your real admin user is configured.");
+        log.warn("===========================================================");
+    }
+
+    /**
+     * Prints a profile-aware startup banner. We avoid printing credentials.
+     */
+    private void printStartupBanner(Environment env) {
+        String[] profiles = env.getActiveProfiles();
+        String activeProfile = profiles.length == 0 ? "default" : String.join(",", profiles);
+        String dbType = inferDatabaseType(env);
+        String port = env.getProperty("server.port", "8080");
+        String contextPath = env.getProperty("server.servlet.context-path", "");
+
+        log.info("==========================================");
+        log.info(" Hostel Management System backend ready");
+        log.info("   Profile : {}", activeProfile);
+        log.info("   Database: {}", dbType);
+        log.info("   URL     : http://localhost:{}{}", port, contextPath);
+        log.info("==========================================");
+    }
+
+    private String inferDatabaseType(Environment env) {
+        String url = env.getProperty("spring.datasource.url", "");
+        if (url.startsWith("jdbc:mysql")) return "MySQL (" + sanitizeUrl(url) + ")";
+        if (url.startsWith("jdbc:postgresql")) return "PostgreSQL (" + sanitizeUrl(url) + ")";
+        if (url.startsWith("jdbc:h2:mem")) return "H2 in-memory";
+        if (url.startsWith("jdbc:h2:file")) return "H2 file-based";
+        if (url.startsWith("jdbc:h2")) return "H2";
+        return url.isEmpty() ? "unknown" : sanitizeUrl(url);
+    }
+
+    /**
+     * Strips query parameters from a JDBC URL so we don't log credentials or
+     * connection-string secrets that some drivers accept inline.
+     */
+    private String sanitizeUrl(String url) {
+        int q = url.indexOf('?');
+        return q < 0 ? url : url.substring(0, q);
     }
 }

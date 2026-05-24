@@ -74,6 +74,18 @@ frontend/
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 
+## API Documentation (Swagger / OpenAPI)
+
+While the backend is running:
+
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+
+The UI lets you explore every endpoint, see request/response schemas, and try
+the APIs directly from the browser. Click **Authorize** at the top, paste your
+JWT access token (from `POST /api/auth/login`), and protected endpoints become
+callable.
+
 ## Features Overview
 
 ### Authentication

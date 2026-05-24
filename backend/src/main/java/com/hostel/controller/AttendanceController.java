@@ -3,6 +3,7 @@ package com.hostel.controller;
 import com.hostel.dto.ApiResponse;
 import com.hostel.dto.AttendanceDTO;
 import com.hostel.service.AttendanceService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Attendance", description = "Daily and per-student attendance records")
 @RestController
 @RequestMapping("/api/attendance")
 public class AttendanceController {

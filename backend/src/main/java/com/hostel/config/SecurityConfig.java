@@ -1,5 +1,6 @@
 package com.hostel.config;
 
+import com.hostel.constants.ApiPaths;
 import com.hostel.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,9 +38,10 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers(ApiPaths.AUTH_PATTERN).permitAll()
+                .requestMatchers(ApiPaths.PUBLIC_PATTERN).permitAll()
+                .requestMatchers(ApiPaths.SWAGGER_PATTERNS).permitAll()
+                .requestMatchers(ApiPaths.H2_CONSOLE_PATTERNS).permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(
@@ -47,7 +49,7 @@ public class SecurityConfig {
                 UsernamePasswordAuthenticationFilter.class
             );
 
-        // Allow H2 console iframe
+        // Allow H2 console iframe (dev only)
         http.headers(headers ->
             headers.frameOptions(frame -> frame.disable()));
 

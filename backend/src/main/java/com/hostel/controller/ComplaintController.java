@@ -3,6 +3,7 @@ package com.hostel.controller;
 import com.hostel.dto.ApiResponse;
 import com.hostel.dto.ComplaintDTO;
 import com.hostel.service.ComplaintService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Complaints", description = "Student complaint workflow (open, in-progress, resolved)")
 @RestController
 @RequestMapping("/api/complaints")
 public class ComplaintController {

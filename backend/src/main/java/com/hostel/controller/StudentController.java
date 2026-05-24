@@ -3,6 +3,7 @@ package com.hostel.controller;
 import com.hostel.dto.ApiResponse;
 import com.hostel.dto.StudentDTO;
 import com.hostel.service.StudentService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +13,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Students", description = "Student records, search, and CRUD")
 @RestController
 @RequestMapping("/api/students")
 public class StudentController {

@@ -3,6 +3,7 @@ package com.hostel.controller;
 import com.hostel.dto.ApiResponse;
 import com.hostel.dto.FeeDTO;
 import com.hostel.service.FeeService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Fees", description = "Fee records, payment status, and per-student fee history")
 @RestController
 @RequestMapping("/api/fees")
 public class FeeController {

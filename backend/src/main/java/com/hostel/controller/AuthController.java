@@ -4,6 +4,9 @@ import com.hostel.dto.*;
 import com.hostel.dto.PasswordRequests.*;
 import com.hostel.service.AuthService;
 import com.hostel.service.PasswordService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +18,7 @@ import com.hostel.security.CustomUserDetails;
 import java.util.HashMap;
 import java.util.Map;
 
+@Tag(name = "Authentication", description = "Login, registration, password management, and current-user endpoints")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -27,18 +31,26 @@ public class AuthController {
         this.passwordService = passwordService;
     }
 
+    @Operation(summary = "Login with email and password",
+               description = "Returns access + refresh tokens and the authenticated user.")
+    @SecurityRequirements // No auth required
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
     }
 
+    @Operation(summary = "Register a new user",
+               description = "Public self-service registration. Use ADMIN/WARDEN role only when invoked by an existing admin.")
+    @SecurityRequirements
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
         return ResponseEntity.ok(ApiResponse.success("Registration successful", response));
     }
 
+    @Operation(summary = "Exchange a refresh token for a new access + refresh token pair")
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
@@ -46,6 +58,10 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Request a password reset link",
+               description = "Always returns 200 to avoid leaking whether the email exists. " +
+                             "In dev, the reset token is included in the response for testing.")
+    @SecurityRequirements
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Map<String, Object>>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
@@ -65,12 +81,16 @@ public class AuthController {
         ));
     }
 
+    @Operation(summary = "Reset a password using a token from the forgot-password flow")
+    @SecurityRequirements
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully", null));
     }
 
+    @Operation(summary = "Change the current user's password",
+               description = "Requires the current password for confirmation.")
     @PostMapping("/change-password")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> changePassword(
@@ -84,6 +104,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", null));
     }
 
+    @Operation(summary = "Get the currently authenticated user")
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser(

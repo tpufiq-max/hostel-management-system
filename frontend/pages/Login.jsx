@@ -117,13 +117,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-            <p className="text-xs text-blue-700">Email: admin@hostel.com</p>
-            <p className="text-xs text-blue-700">Password: admin123</p>
-          </div>
         </div>
       </div>
     </div>

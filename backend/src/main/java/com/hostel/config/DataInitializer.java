@@ -1,90 +1,85 @@
 package com.hostel.config;
 
-import com.hostel.entity.*;
-import com.hostel.repository.*;
+import com.hostel.entity.User;
+import com.hostel.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.LocalDate;
-
+/**
+ * Bootstraps the initial admin account on first startup so the application
+ * is usable out-of-the-box. No demo students, rooms, or fees are seeded —
+ * all real data is entered through the application UI/API.
+ *
+ * The admin is only created when:
+ *   1. app.bootstrap.admin.enabled=true (default true), AND
+ *   2. No user with the bootstrap email already exists in the database.
+ *
+ * Override the defaults via environment variables or application properties:
+ *   APP_BOOTSTRAP_ADMIN_EMAIL
+ *   APP_BOOTSTRAP_ADMIN_PASSWORD
+ *   APP_BOOTSTRAP_ADMIN_NAME
+ *   APP_BOOTSTRAP_ADMIN_USERNAME
+ *   APP_BOOTSTRAP_ADMIN_PHONE
+ */
 @Configuration
 public class DataInitializer {
 
+    private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
+
+    @Value("${app.bootstrap.admin.enabled:true}")
+    private boolean bootstrapEnabled;
+
+    @Value("${app.bootstrap.admin.email:admin@hostel.local}")
+    private String adminEmail;
+
+    @Value("${app.bootstrap.admin.password:ChangeMe@123}")
+    private String adminPassword;
+
+    @Value("${app.bootstrap.admin.name:Administrator}")
+    private String adminName;
+
+    @Value("${app.bootstrap.admin.username:admin}")
+    private String adminUsername;
+
+    @Value("${app.bootstrap.admin.phone:0000000000}")
+    private String adminPhone;
+
     @Bean
-    CommandLineRunner initData(UserRepository userRepository, StudentRepository studentRepository,
-                               RoomRepository roomRepository, PasswordEncoder passwordEncoder) {
+    CommandLineRunner initData(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
-            // Create admin user if not exists
-            if (!userRepository.existsByEmail("admin@hostel.com")) {
-                User admin = User.builder()
-                        .name("Admin User")
-                        .username("admin")
-                        .email("admin@hostel.com")
-                        .password(passwordEncoder.encode("admin123"))
-                        .role(User.Role.ADMIN)
-                        .phone("9876543210")
-                        .isActive(true)
-                        .build();
-                userRepository.save(admin);
+            if (!bootstrapEnabled) {
+                log.info("Admin bootstrap disabled (app.bootstrap.admin.enabled=false). Skipping.");
+                return;
             }
 
-            // Create student user if not exists
-            if (!userRepository.existsByEmail("student@hostel.com")) {
-                User studentUser = User.builder()
-                        .name("John Doe")
-                        .username("johndoe")
-                        .email("student@hostel.com")
-                        .password(passwordEncoder.encode("student123"))
-                        .role(User.Role.STUDENT)
-                        .phone("9876543211")
-                        .isActive(true)
-                        .build();
-                userRepository.save(studentUser);
+            if (userRepository.existsByEmail(adminEmail)) {
+                log.info("Admin account '{}' already exists. Skipping bootstrap.", adminEmail);
+                return;
             }
 
-            // Create sample rooms
-            if (roomRepository.count() == 0) {
-                for (int floor = 1; floor <= 3; floor++) {
-                    for (int room = 1; room <= 10; room++) {
-                        String roomNumber = floor + String.format("%02d", room);
-                        roomRepository.save(Room.builder()
-                                .roomNumber(roomNumber)
-                                .capacity(room <= 5 ? 2 : 3)
-                                .occupied(0)
-                                .block("A")
-                                .floor(floor)
-                                .type(room <= 5 ? Room.RoomType.DOUBLE : Room.RoomType.TRIPLE)
-                                .status(Room.RoomStatus.AVAILABLE)
-                                .monthlyRent(room <= 5 ? 5000.0 : 4000.0)
-                                .amenities("WiFi,AC,Attached Bathroom")
-                                .build());
-                    }
-                }
-            }
+            User admin = User.builder()
+                    .name(adminName)
+                    .username(adminUsername)
+                    .email(adminEmail)
+                    .password(passwordEncoder.encode(adminPassword))
+                    .role(User.Role.ADMIN)
+                    .phone(adminPhone)
+                    .isActive(true)
+                    .build();
 
-            // Create sample students
-            if (studentRepository.count() == 0) {
-                String[] names = {"John Doe", "Jane Smith", "Mike Johnson", "Emily Davis", "Chris Wilson"};
-                String[] courses = {"B.Tech CSE", "B.Tech ECE", "B.Tech ME", "BBA", "B.Sc Physics"};
-                for (int i = 0; i < names.length; i++) {
-                    studentRepository.save(Student.builder()
-                            .name(names[i])
-                            .email(names[i].toLowerCase().replace(" ", ".") + "@student.hostel.com")
-                            .phone("98765432" + (10 + i))
-                            .rollNumber("2024" + String.format("%03d", i + 1))
-                            .course(courses[i])
-                            .department(courses[i].contains("Tech") ? "Engineering" : "Science")
-                            .year(2)
-                            .roomNumber("1" + String.format("%02d", i + 1))
-                            .gender(i % 2 == 0 ? "Male" : "Female")
-                            .feesStatus(i < 3 ? Student.FeesStatus.PAID : Student.FeesStatus.PENDING)
-                            .isActive(true)
-                            .admissionDate(LocalDate.of(2024, 7, 1))
-                            .build());
-                }
-            }
+            userRepository.save(admin);
+
+            log.warn("===========================================================");
+            log.warn(" Initial admin account created: {}", adminEmail);
+            log.warn(" Please log in and CHANGE THE DEFAULT PASSWORD immediately.");
+            log.warn(" Disable bootstrap in production by setting:");
+            log.warn("   app.bootstrap.admin.enabled=false");
+            log.warn("===========================================================");
         };
     }
 }

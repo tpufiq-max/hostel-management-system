@@ -2,45 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+ * Design tokens
+ *
+ * Single source of truth for every color in the app. Tailwind's `colors` block
+ * in tailwind.config.js maps semantic names (bg, surface, accent, etc.) to
+ * these variables, so flipping `class="dark"` on <html> automatically flips
+ * every `bg-surface` / `text-muted` / `border-border` utility AND every inline
+ * `var(--accent)` reference at the same time.
+ *
+ * Aliases like `--bg-primary` exist so legacy components keep working until
+ * they get migrated to semantic class names in F4 onwards.
+ * ============================================================================= */
+
 :root {
   color-scheme: light;
 
-  --bg-primary: #f1f5f9;
-  --bg-secondary: #ffffff;
-  --bg-sidebar: #0f172a;
+  /* Surface scale */
+  --bg:      #f1f5f9;
+  --surface: #ffffff;
+  --card:    #ffffff;
+  --border:  #e2e8f0;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
+  /* Text */
+  --text:    #0f172a;
+  --muted:   #475569;
 
-  --border-color: #e2e8f0;
+  /* Brand / status */
+  --accent:        #2563eb;
+  --accent-hover:  #1d4ed8;
+  --success:       #16a34a;
+  --danger:        #ef4444;
+  --warning:       #f59e0b;
+  --purple:        #9333ea;
+  --gold:          #d97706;
 
-  --card-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  /* Shadows */
+  --card-shadow:    0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --popover-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
 
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  /* Backwards-compat aliases used by older components */
+  --bg-primary:     var(--bg);
+  --bg-secondary:   var(--surface);
+  --bg-sidebar:     #0f172a;
+  --text-primary:   var(--text);
+  --text-secondary: var(--muted);
+  --border-color:   var(--border);
+  --background:     var(--bg);
 }
 
 .dark {
   color-scheme: dark;
 
-  --bg-primary: #020617;
-  --bg-secondary: #0f172a;
-  --bg-sidebar: #020617;
+  --bg:      #020617;
+  --surface: #0b1220;
+  --card:    #0f172a;
+  --border:  #1e293b;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
+  --text:    #f8fafc;
+  --muted:   #94a3b8;
 
-  --border-color: #1e293b;
+  --accent:        #3b82f6;
+  --accent-hover:  #60a5fa;
+  --success:       #22c55e;
+  --danger:        #f87171;
+  --warning:       #fbbf24;
+  --purple:        #a855f7;
+  --gold:          #f59e0b;
 
-  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --card-shadow:    0 1px 3px rgba(0, 0, 0, 0.4);
+  --popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
+  --bg-primary:     var(--bg);
+  --bg-secondary:   var(--surface);
+  --bg-sidebar:     var(--bg);
+  --text-primary:   var(--text);
+  --text-secondary: var(--muted);
+  --border-color:   var(--border);
+  --background:     var(--bg);
 }
 
-* {
-  margin: 0;
-  padding: 0;
+/* =============================================================================
+ * Reset / base
+ * ============================================================================= */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -51,14 +99,18 @@ body,
   min-height: 100%;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
-  font-family: Inter, system-ui, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  transition:
-    background-color 0.35s ease,
-    color 0.35s ease;
-  overflow-x: hidden;
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -66,84 +118,117 @@ input,
 textarea,
 select {
   font: inherit;
+  color: inherit;
 }
 
-button {
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-button:hover {
-  transform: translateY(-1px);
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-.card-ui {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  box-shadow: var(--card-shadow);
-  transition: all 0.3s ease;
-}
-
-.card-ui:hover {
-  transform: translateY(-3px);
-}
-
-.text-secondary {
-  color: var(--text-secondary);
-}
+/* =============================================================================
+ * Theme transition
+ *
+ * Toggled on by ThemeContext during a theme switch and removed ~400ms later,
+ * so the entire UI fades smoothly between modes without animating every hover
+ * state during normal use.
+ * ============================================================================= */
 
 .theme-transition,
 .theme-transition *,
 .theme-transition *::before,
 .theme-transition *::after {
   transition:
-    background-color 0.35s ease,
-    color 0.35s ease,
-    border-color 0.35s ease,
-    box-shadow 0.35s ease !important;
+    background-color 0.3s ease,
+    color            0.3s ease,
+    border-color     0.3s ease,
+    fill             0.3s ease,
+    stroke           0.3s ease,
+    box-shadow       0.3s ease !important;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-}
+/* =============================================================================
+ * Scrollbars (subtle, theme-aware)
+ * ============================================================================= */
 
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-
+::-webkit-scrollbar       { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #64748b;
-  border-radius: 100px;
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
-.sidebar {
-  background: var(--bg-sidebar);
+/* =============================================================================
+ * Selection + focus
+ * ============================================================================= */
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
 }
 
-.navbar-ui {
-  background: rgba(255, 255, 255, 0.7);
-  border-bottom: 1px solid var(--border-color);
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Input autofill (Chrome/Safari) — keep theme colors */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  caret-color: var(--text);
+  transition: background-color 9999s ease-in-out;
+}
+
+/* =============================================================================
+ * Utility component classes
+ * Small, opt-in helpers consumed via @apply-friendly className references.
+ * Real components (DataTable, Modal, etc.) come in F4.
+ * ============================================================================= */
+
+.card-ui {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-ui:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--popover-shadow);
+}
+
+.text-secondary { color: var(--muted); }
+
+.sidebar    { background: var(--bg-sidebar); }
+.navbar-ui  {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-bottom: 1px solid var(--border);
   backdrop-filter: blur(20px);
 }
 
-.dark .navbar-ui {
-  background: rgba(2, 6, 23, 0.7);
-}
+/* =============================================================================
+ * Animations referenced from JSX (in addition to Tailwind's animation utilities)
+ * ============================================================================= */
 
-.dashboard-stat-card {
-  padding: 1.5rem;
-  border-radius: 24px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--card-shadow);
-  transition: all 0.3s ease;
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.dashboard-stat-card:hover {
-  transform: translateY(-4px) scale(1.01);
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
 }

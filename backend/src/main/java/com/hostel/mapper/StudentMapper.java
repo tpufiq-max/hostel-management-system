@@ -39,7 +39,10 @@ public interface StudentMapper {
     @Mapping(target = "room", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "active", ignore = true) // boolean isActive: leave entity default = true
+    // Lombok @Builder names the method after the field (`isActive`),
+    // not the JavaBean property (`active`). MapStruct picks the builder
+    // when one is available, so we have to target the field name here.
+    @Mapping(target = "isActive", ignore = true)
     @Mapping(target = "dateOfBirth", source = "dateOfBirth", qualifiedByName = "stringToLocalDate")
     @Mapping(target = "admissionDate", source = "admissionDate", qualifiedByName = "stringToLocalDate")
     @Mapping(target = "feesStatus", expression = "java(com.hostel.mapper.CommonConverters.toEnum(com.hostel.entity.Student.FeesStatus.class, dto.getFeesStatus()))")
@@ -53,7 +56,7 @@ public interface StudentMapper {
     @Mapping(target = "room", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    @Mapping(target = "active", ignore = true)
+    @Mapping(target = "isActive", ignore = true)
     @Mapping(target = "dateOfBirth", source = "dateOfBirth", qualifiedByName = "stringToLocalDate")
     @Mapping(target = "admissionDate", source = "admissionDate", qualifiedByName = "stringToLocalDate")
     @Mapping(target = "feesStatus", expression = "java(dto.getFeesStatus() == null ? entity.getFeesStatus() : com.hostel.mapper.CommonConverters.toEnum(com.hostel.entity.Student.FeesStatus.class, dto.getFeesStatus()))")

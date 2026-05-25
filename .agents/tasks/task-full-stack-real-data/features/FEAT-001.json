@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Create complete backend CRUD for Mess Management, Maintenance, Visitors, Notices, and Events - all five new modules with Entity, DTO, Mapper, Repository, Service, and Controller layers following existing patterns exactly.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create MessMenu entity at backend/src/main/java/com/hostel/entity/MessMenu.java with fields: id, day (enum MON/TUE/WED/THU/FRI/SAT/SUN), mealType (enum BREAKFAST/LUNCH/DINNER/SNACKS), items (String), specialNote, isActive (boolean default true), effectiveFrom (LocalDate), effectiveTo (LocalDate), createdAt, updatedAt. Follow Student.java pattern with @PrePersist/@PreUpdate.",
     "Create MaintenanceRequest entity at backend/src/main/java/com/hostel/entity/MaintenanceRequest.java with fields: id, title, description, roomNumber, category (enum PLUMBING/ELECTRICAL/FURNITURE/CLEANING/OTHER), priority (enum LOW/MEDIUM/HIGH/CRITICAL), status (enum OPEN/ASSIGNED/IN_PROGRESS/COMPLETED/REJECTED), reportedBy, assignedTo (nullable), reportedDate (LocalDate), completedDate (LocalDate nullable), estimatedCost (BigDecimal nullable), notes, createdAt, updatedAt.",
@@ -29,5 +29,5 @@
     "cd /projects/sandbox/hostel-management-system/backend && mvn compile -DskipTests -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Compilation requires Java 17 (not the default Java 25 in this environment). Use: export JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 && export PATH=$JAVA_HOME/bin:$PATH before running mvn compile. All 5 modules compile successfully with MapStruct annotation processing generating implementations."
 }

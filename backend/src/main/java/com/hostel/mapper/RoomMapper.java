@@ -16,7 +16,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * applied via {@link #applyDefaults} since explicit-null DTO values would
  * otherwise wipe entity field initializers.
  */
-@Mapper(componentModel = "spring", uses = CommonConverters.class)
+@Mapper(componentModel = "spring", uses = CommonConverters.class,
+        builder = @org.mapstruct.Builder(disableBuilder = true))
 public interface RoomMapper {
 
     @Mapping(target = "type", expression = "java(room.getType() == null ? null : room.getType().name())")

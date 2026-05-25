@@ -15,7 +15,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * <p>Like {@link FeeMapper}, the {@code Student} association is supplied by
  * the service layer rather than re-fetched in the mapper.
  */
-@Mapper(componentModel = "spring", uses = CommonConverters.class)
+@Mapper(componentModel = "spring", uses = CommonConverters.class,
+        builder = @org.mapstruct.Builder(disableBuilder = true))
 public interface AttendanceMapper {
 
     @Mapping(target = "studentId", source = "student.id")

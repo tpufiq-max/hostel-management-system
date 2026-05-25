@@ -22,7 +22,8 @@ import java.time.LocalDateTime;
  *       {@code resolvedAt} timestamp — see {@link #stampResolvedAt}.</li>
  * </ol>
  */
-@Mapper(componentModel = "spring", uses = CommonConverters.class)
+@Mapper(componentModel = "spring", uses = CommonConverters.class,
+        builder = @org.mapstruct.Builder(disableBuilder = true))
 public interface ComplaintMapper {
 
     @Mapping(target = "studentId", source = "student.id")

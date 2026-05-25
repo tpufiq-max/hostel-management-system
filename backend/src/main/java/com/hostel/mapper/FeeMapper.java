@@ -17,7 +17,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  * layer (which already loads it to validate the FK), so the mapper does not
  * make any extra queries.
  */
-@Mapper(componentModel = "spring", uses = CommonConverters.class)
+@Mapper(componentModel = "spring", uses = CommonConverters.class,
+        builder = @org.mapstruct.Builder(disableBuilder = true))
 public interface FeeMapper {
 
     @Mapping(target = "studentId", source = "student.id")

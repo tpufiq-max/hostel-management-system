@@ -1,240 +1,158 @@
-import React, {
+// ThemeContext
+// ──────────────────────────────────────────────────────────────────────────────
+// Owns the dark/light mode state. The actual color values live in
+// styles/global.css as CSS custom properties under `:root` and `.dark` —
+// this provider's only job is to:
+//
+//   1. Pick the initial mode (saved preference → system preference → dark)
+//   2. Toggle `class="dark"` on <html>
+//   3. Persist the choice to localStorage
+//   4. Expose a `useTheme()` hook + a backwards-compat `t` palette object
+//      so legacy components that read `t.bg` / `t.accent` keep working until
+//      they get migrated to Tailwind classes / CSS variables.
+//
+// We do NOT inject CSS variables from JS anymore — global.css owns them and
+// flipping the class is enough to switch every variable atomically.
+
+import {
   createContext,
+  useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
-  useCallback,
 } from "react";
 
-// ── Theme palettes ────────────────────────────────────────────────────────────
-export const darkTheme = {
-  bg: "#020617", surface: "#0b1220", card: "#0f172a",
-  border: "#1e293b", text: "#f8fafc", muted: "#94a3b8",
-  accent: "#3b82f6", success: "#22c55e", danger: "#f87171",
-  warning: "#fbbf24", gold: "#f59e0b", purple: "#a855f7",
-};
+const THEME_STORAGE_KEY = "hms_theme";
+const TRANSITION_CLASS  = "theme-transition";
+const TRANSITION_MS     = 400;
 
-export const lightTheme = {
-  bg: "#f1f5f9", surface: "#ffffff", card: "#ffffff",
-  border: "#e2e8f0", text: "#0f172a", muted: "#475569",
-  accent: "#2563eb", success: "#16a34a", danger: "#ef4444",
-  warning: "#f59e0b", gold: "#d97706", purple: "#9333ea",
-};
+// ── Backwards-compat palette objects (for code still using `t.bg` etc.) ──────
+// These values must stay in sync with the variables in styles/global.css.
+export const lightTheme = Object.freeze({
+  bg:      "#f1f5f9",
+  surface: "#ffffff",
+  card:    "#ffffff",
+  border:  "#e2e8f0",
+  text:    "#0f172a",
+  muted:   "#475569",
+  accent:  "#2563eb",
+  success: "#16a34a",
+  danger:  "#ef4444",
+  warning: "#f59e0b",
+  gold:    "#d97706",
+  purple:  "#9333ea",
+});
 
-// ── CSS variables map — keeps Tailwind/CSS classes working alongside ──────────
-const CSS_VARS = {
-  dark: {
-    "--bg":      "#020617",
-    "--surface": "#0b1220",
-    "--card":    "#0f172a",
-    "--border":  "#1e293b",
-    "--text":    "#f8fafc",
-    "--muted":   "#94a3b8",
-    "--accent":  "#3b82f6",
-    "--success": "#22c55e",
-    "--danger":  "#f87171",
-    "--warning": "#fbbf24",
-    "--gold":    "#f59e0b",
-    "--purple":  "#a855f7",
-    "--background": "#020617",
-  },
-  light: {
-    "--bg":      "#f1f5f9",
-    "--surface": "#ffffff",
-    "--card":    "#ffffff",
-    "--border":  "#e2e8f0",
-    "--text":    "#0f172a",
-    "--muted":   "#475569",
-    "--accent":  "#2563eb",
-    "--success": "#16a34a",
-    "--danger":  "#ef4444",
-    "--warning": "#f59e0b",
-    "--gold":    "#d97706",
-    "--purple":  "#9333ea",
-    "--background": "#f1f5f9",
-  },
-};
+export const darkTheme = Object.freeze({
+  bg:      "#020617",
+  surface: "#0b1220",
+  card:    "#0f172a",
+  border:  "#1e293b",
+  text:    "#f8fafc",
+  muted:   "#94a3b8",
+  accent:  "#3b82f6",
+  success: "#22c55e",
+  danger:  "#f87171",
+  warning: "#fbbf24",
+  gold:    "#f59e0b",
+  purple:  "#a855f7",
+});
 
-// ── Context ───────────────────────────────────────────────────────────────────
+// ── Context ──────────────────────────────────────────────────────────────────
 export const ThemeContext = createContext({
   theme:       "dark",
+  isDark:      true,
   toggleTheme: () => {},
+  setTheme:    () => {},
   t:           darkTheme,
   darkTheme,
   lightTheme,
 });
 
-// ── Provider ──────────────────────────────────────────────────────────────────
+/** Convenience hook — `const { isDark, toggleTheme, t } = useTheme();` */
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
+function getInitialTheme() {
+  // Saved preference always wins.
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "dark" || saved === "light") return saved;
+  } catch {
+    // localStorage unavailable (SSR / private mode) — fall through.
+  }
+  // Otherwise fall back to system preference, defaulting to dark for SSR.
+  if (typeof window !== "undefined" && window.matchMedia) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+  return "dark";
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────────
 export function ThemeProvider({ children }) {
-  const [theme,   setTheme]   = useState("dark");
-  const [mounted, setMounted] = useState(false);
+  // Initialise lazily so the very first render already has the right mode —
+  // no flash of the wrong theme before useEffect fires.
+  const [theme, setThemeState] = useState(getInitialTheme);
 
-  // ── 1. Rehydrate on mount ─────────────────────────────────────────────────
+  // Apply the class to <html> any time the theme changes (and once on mount).
   useEffect(() => {
-    const saved = localStorage.getItem("hms_theme");
-
-    if (saved === "dark" || saved === "light") {
-      setTheme(saved);
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setTheme(prefersDark ? "dark" : "light");
-    }
-
-    setMounted(true);
-  }, []);
-
-  // ── 2. Apply classes, CSS vars & localStorage whenever theme changes ──────
-  useEffect(() => {
-    if (!mounted) return;
+    if (typeof document === "undefined") return;
 
     const html = document.documentElement;
-    const body = document.body;
 
-    // Smooth transition class (your existing behaviour preserved)
-    html.classList.add("theme-transition");
-    body.classList.add("theme-transition");
+    html.classList.add(TRANSITION_CLASS);
+    if (theme === "dark") html.classList.add("dark");
+    else                  html.classList.remove("dark");
 
-    // dark / light class on <html> (Tailwind dark-mode compatible)
-    if (theme === "dark") {
-      html.classList.add("dark");
-      body.classList.add("dark");
-    } else {
-      html.classList.remove("dark");
-      body.classList.remove("dark");
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Best-effort persistence; swallow quota / privacy errors.
     }
 
-    // Inject CSS custom properties so legacy CSS (var(--accent) etc.) still works
-    const vars = CSS_VARS[theme];
-    Object.entries(vars).forEach(([k, v]) => {
-      html.style.setProperty(k, v);
-    });
+    const id = setTimeout(() => html.classList.remove(TRANSITION_CLASS), TRANSITION_MS);
+    return () => clearTimeout(id);
+  }, [theme]);
 
-    // Also set background so the page never shows a white flash in dark mode
-    body.style.background    = vars["--bg"];
-    body.style.color         = vars["--text"];
-    body.style.transition    = "background 0.3s, color 0.3s";
+  // Listen for system-preference changes ONLY when the user hasn't picked a
+  // mode explicitly. Once they toggle, their choice sticks.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch { /* ignore */ }
+    if (saved === "dark" || saved === "light") return;
 
-    localStorage.setItem("hms_theme", theme);
-
-    const timeout = setTimeout(() => {
-      html.classList.remove("theme-transition");
-      body.classList.remove("theme-transition");
-    }, 400);
-
-    return () => clearTimeout(timeout);
-  }, [theme, mounted]);
-
-  // ── 3. Toggle ─────────────────────────────────────────────────────────────
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === "dark" ? "light" : "dark"));
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e) => setThemeState(e.matches ? "dark" : "light");
+    mql.addEventListener?.("change", handler);
+    return () => mql.removeEventListener?.("change", handler);
   }, []);
 
-  // ── 4. Memoised context value ─────────────────────────────────────────────
-  const value = useMemo(() => ({
-    theme,
-    toggleTheme,
-    t:         theme === "dark" ? darkTheme : lightTheme,
-    darkTheme,
-    lightTheme,
-    isDark:    theme === "dark",
-  }), [theme, toggleTheme]);
-
-  // ── 5. Block render until mounted (avoids SSR / hydration flash) ──────────
-  if (!mounted) {
-    return (
-      <div style={{
-        minHeight: "100vh",
-        background: "#020617",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 16,
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}>
-        <div style={{
-          width: 44, height: 44,
-          border: "3px solid #1e293b",
-          borderTop: "3px solid #3b82f6",
-          borderRadius: "50%",
-          animation: "spin 0.8s linear infinite",
-        }} />
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>Initialising theme…</div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {/* Inject global styles once */}
-      <style>{`
-        /* Smooth theme transitions */
-        .theme-transition,
-        .theme-transition * {
-          transition:
-            background-color 0.3s ease,
-            border-color     0.3s ease,
-            color            0.3s ease,
-            fill             0.3s ease,
-            stroke           0.3s ease !important;
-        }
-
-        /* Scrollbar — dark */
-        html.dark ::-webkit-scrollbar        { width: 6px; height: 6px; }
-        html.dark ::-webkit-scrollbar-track  { background: #0b1220; }
-        html.dark ::-webkit-scrollbar-thumb  { background: #1e293b; border-radius: 4px; }
-        html.dark ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
-
-        /* Scrollbar — light */
-        html:not(.dark) ::-webkit-scrollbar        { width: 6px; height: 6px; }
-        html:not(.dark) ::-webkit-scrollbar-track  { background: #f1f5f9; }
-        html:not(.dark) ::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 4px; }
-        html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
-
-        /* Selection highlight */
-        html.dark  ::selection { background: #3b82f644; color: #f8fafc; }
-        html:not(.dark) ::selection { background: #2563eb44; color: #0f172a; }
-
-        /* Prevent layout shift from scrollbar appearing/disappearing */
-        html { scrollbar-gutter: stable; }
-
-        /* Base reset */
-        *, *::before, *::after { box-sizing: border-box; }
-
-        /* Select option theming */
-        html.dark  select option { background: #0f172a; color: #f8fafc; }
-        html:not(.dark) select option { background: #ffffff; color: #0f172a; }
-
-        /* Input autofill override */
-        input:-webkit-autofill {
-          -webkit-box-shadow: 0 0 0 1000px var(--card) inset !important;
-          -webkit-text-fill-color: var(--text) !important;
-          transition: background-color 9999s ease;
-        }
-
-        /* Animations */
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0);    }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(-10px); }
-          to   { opacity: 1; transform: translateX(0);      }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1;   }
-          50%       { opacity: 0.5; }
-        }
-      `}</style>
-      {children}
-    </ThemeContext.Provider>
+  const toggleTheme = useCallback(
+    () => setThemeState(prev => (prev === "dark" ? "light" : "dark")),
+    []
   );
+
+  const setTheme = useCallback((next) => {
+    if (next === "dark" || next === "light") setThemeState(next);
+  }, []);
+
+  const value = useMemo(() => {
+    const isDark = theme === "dark";
+    return {
+      theme,
+      isDark,
+      toggleTheme,
+      setTheme,
+      t: isDark ? darkTheme : lightTheme,
+      darkTheme,
+      lightTheme,
+    };
+  }, [theme, toggleTheme, setTheme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

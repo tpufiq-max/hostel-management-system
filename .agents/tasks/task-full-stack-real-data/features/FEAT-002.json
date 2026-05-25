@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Create Analytics endpoints and upgrade Dashboard to include data from new tables (visitors, maintenance). Add real database aggregation queries for revenue trends, occupancy, complaint analytics, and attendance trends.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create AnalyticsController at backend/src/main/java/com/hostel/controller/AnalyticsController.java with endpoints: GET /api/analytics/summary, GET /api/analytics/revenue, GET /api/analytics/occupancy, GET /api/analytics/complaints, GET /api/analytics/attendance. All return ResponseEntity<ApiResponse<T>>.",
     "Create AnalyticsService at backend/src/main/java/com/hostel/service/AnalyticsService.java that queries all repositories for aggregated data. Summary: total counts from all tables. Revenue: monthly fee collection using @Query with GROUP BY month. Occupancy: room status counts. Complaints: counts by status and category. Attendance: percentage by date range.",
@@ -22,5 +22,5 @@
     "cd /projects/sandbox/hostel-management-system/backend && mvn compile -DskipTests -q"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All analytics code compiles cleanly with Java 17. Used JPQL with YEAR()/MONTH()/LPAD()/CAST() functions for H2-compatible monthly revenue grouping. AttendanceRepository uses date range grouped query returning Object[] for flexible aggregation in service layer. DashboardService now injects all 9 repositories."
 }

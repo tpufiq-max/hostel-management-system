@@ -89,6 +89,8 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
+        </dependency>
+
         <!-- Springdoc OpenAPI (Swagger UI at /swagger-ui.html) -->
         <dependency>
             <groupId>org.springdoc</groupId>

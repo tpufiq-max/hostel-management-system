@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Create the complete backend Allocation CRUD: entity, DTO, repository, mapper, service, and controller. This follows the exact same patterns as the Fee entity/service/controller which also has a @ManyToOne relationship to Student and Room.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create backend/src/main/java/com/hostel/entity/Allocation.java with fields: id (Long, @Id @GeneratedValue IDENTITY), student (@ManyToOne LAZY to Student, @JoinColumn student_id not null), room (@ManyToOne LAZY to Room, @JoinColumn room_id not null), assignedOn (LocalDate), notes (String, nullable), createdAt (LocalDateTime), updatedAt (LocalDateTime). Use @Data @NoArgsConstructor @AllArgsConstructor @Builder. Add @PrePersist and @PreUpdate lifecycle callbacks for timestamps. Use @Entity @Table(name = \"allocations\").",
     "Create backend/src/main/java/com/hostel/dto/AllocationDTO.java with fields: id (Long), studentId (Long, @NotNull), studentName (String), roomId (Long, @NotNull), roomNumber (String), course (String, derived from student.course), assignedOn (String), notes (String), createdAt (String). Use @Data @Builder @AllArgsConstructor @NoArgsConstructor.",
@@ -22,5 +22,5 @@
     "Verify AllocationMapperImpl is generated in target/generated-sources"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Maven required proxy config in ~/.m2/settings.xml to connect to Maven Central (Java networking doesn't use http_proxy env vars). Build succeeds with `JAVA_HOME=/opt/toolchains/.local/share/mise/installs/java/17.0.2 mvn compile -DskipTests`. AllocationMapperImpl generated correctly with all nested field mappings."
 }

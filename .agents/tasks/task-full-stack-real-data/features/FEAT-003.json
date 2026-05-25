@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Rewrite ALL frontend pages that use hardcoded data to use real API calls via service layers. Create proper service files, add loading/error/empty states, search/filter functionality, and pagination. Pages: Mess, Maintenance, Visitor, Notice (NoticeList + NoticeForm components), EventCalendar, Analytics, Reports, StudentProfiles.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Rewrite frontend/features/mess/messService.js to be a full service (following allocationService.js pattern) with methods: list (GET /mess with day/mealType filters), get (GET /mess/{id}), create (POST /mess), update (PUT /mess/{id}), remove (DELETE /mess/{id}). Include unwrap() and normalisePage() helpers.",
     "Rewrite frontend/pages/Mess.jsx: Remove hardcoded initialMeals array. Add useEffect to fetch from messService.list(). Add loading state (LoadingSkeleton), error state, empty state. Add filter dropdowns for day and mealType that pass to API. Keep the existing card layout and modal form but wire to create/update/delete via service. Use dark theme CSS vars (var(--text), var(--surface), var(--muted), var(--accent)).",
@@ -33,5 +33,5 @@
     "cd /projects/sandbox/hostel-management-system/frontend && npm run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All 8 pages rewritten successfully. Frontend build passes (vite build, 136 modules transformed). NODE_OPTIONS env var caused issues with npm run build but unset NODE_OPTIONS && npx vite build works. Created 7 new service files (mess, maintenance, visitor, notice, events, analytics, reports) plus rewrote all pages. Used existing studentService for StudentProfiles. Notice page updated to pass refreshKey prop for list refresh after save."
 }

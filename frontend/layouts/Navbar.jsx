@@ -1,6 +1,6 @@
 import React, { useContext, useState, useEffect } from "react";
-import { ThemeContext } from "../../context/ThemeContext";
-import { AuthContext } from "../../context/AuthContext";
+import { ThemeContext } from "../context/ThemeContext";
+import { AuthContext } from "../context/AuthContext";
 
 export default function Navbar({ sidebarOpen, setSidebarOpen, isMobile, t: tProp, isDark: isDarkProp }) {
   const themeCtx = useContext(ThemeContext);

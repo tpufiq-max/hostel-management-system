@@ -24,6 +24,7 @@ public final class ApiPaths {
     public static final String FEES = API_PREFIX + "/fees";
     public static final String COMPLAINTS = API_PREFIX + "/complaints";
     public static final String ATTENDANCE = API_PREFIX + "/attendance";
+    public static final String ALLOCATIONS = API_PREFIX + "/allocations";
     public static final String DASHBOARD = API_PREFIX + "/dashboard";
     public static final String PUBLIC = API_PREFIX + "/public";
 

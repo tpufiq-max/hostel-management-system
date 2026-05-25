@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Rewrite the frontend Allocation page to use real backend data instead of hardcoded demo data. Create a proper allocationService.js following the feesService.js pattern, and rewrite Allocation.jsx to fetch/create/update/delete allocations via the API, with student and room dropdowns populated from their respective APIs.",
+  "status": "pending",
+  "steps": [
+    "Rewrite frontend/features/allocation/allocationService.js to match the pattern in frontend/features/fees/feesService.js. Import { get, post, put as apiPut, del } from '../../api/api'. Implement: listAllocations(opts) with pagination support, getAllocation(id), createAllocation(payload), updateAllocation(id, payload), deleteAllocation(id). Use the same unwrap() and normalisePage() pattern. Export as default object with list/get/create/update/remove methods.",
+    "Rewrite frontend/pages/Allocation.jsx to: (a) Remove ALL hardcoded data (initialAllocations, students array, rooms array, courses array). (b) Import allocationService from the features/allocation/allocationService. (c) Import { get } from the api layer for fetching students and rooms. (d) On mount, fetch allocations via allocationService.list(), fetch students via get('/students?size=200'), and rooms via get('/rooms?size=200') for dropdowns. (e) Use the same unwrap pattern to extract content arrays from paginated responses. (f) The form should have: student dropdown (populated from real student data, value = studentId, displays name), room dropdown (populated from real room data, value = roomId, displays roomNumber), assignedOn date input, notes textarea (optional). Course should be auto-derived from selected student (not a separate dropdown). (g) On submit, POST {studentId, roomId, assignedOn, notes} to create or PUT to update. (h) On delete, call allocationService.remove(id). (i) Show loading spinner on initial load, error state if fetch fails, 'No allocations yet' empty state. (j) Keep the existing dark-theme-compatible styling using CSS vars (var(--text), var(--surface), var(--muted), var(--background), var(--accent)). (k) The table should display: studentName, roomNumber, course, assignedOn, notes, and action buttons (Edit, Remove).",
+    "Update frontend/features/allocation/components/AllocationForm.jsx to either be a proper form component or simply remove it if the form is inlined in Allocation.jsx (the current Fees page inlines its form). Whichever approach is chosen, ensure it works correctly."
+  ],
+  "acceptance_criteria": [
+    "Allocation.jsx has zero hardcoded student/room/allocation data",
+    "allocationService.js properly calls GET/POST/PUT/DELETE on /allocations endpoints",
+    "Student and Room dropdowns are populated from real API responses",
+    "Course is auto-filled based on selected student rather than a separate dropdown",
+    "The page handles loading, error, and empty states gracefully",
+    "The dark theme styling is preserved using CSS custom properties"
+  ],
+  "verification": [
+    "Read the rewritten Allocation.jsx and confirm no hardcoded demo data remains",
+    "Read allocationService.js and confirm it follows the feesService.js pattern with proper API calls"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

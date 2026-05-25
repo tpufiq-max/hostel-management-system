@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the complete backend Allocation CRUD: entity, DTO, repository, mapper, service, and controller. This follows the exact same patterns as the Fee entity/service/controller which also has a @ManyToOne relationship to Student and Room.",
+  "status": "in_progress",
+  "steps": [
+    "Create backend/src/main/java/com/hostel/entity/Allocation.java with fields: id (Long, @Id @GeneratedValue IDENTITY), student (@ManyToOne LAZY to Student, @JoinColumn student_id not null), room (@ManyToOne LAZY to Room, @JoinColumn room_id not null), assignedOn (LocalDate), notes (String, nullable), createdAt (LocalDateTime), updatedAt (LocalDateTime). Use @Data @NoArgsConstructor @AllArgsConstructor @Builder. Add @PrePersist and @PreUpdate lifecycle callbacks for timestamps. Use @Entity @Table(name = \"allocations\").",
+    "Create backend/src/main/java/com/hostel/dto/AllocationDTO.java with fields: id (Long), studentId (Long, @NotNull), studentName (String), roomId (Long, @NotNull), roomNumber (String), course (String, derived from student.course), assignedOn (String), notes (String), createdAt (String). Use @Data @Builder @AllArgsConstructor @NoArgsConstructor.",
+    "Create backend/src/main/java/com/hostel/repository/AllocationRepository.java extending JpaRepository<Allocation, Long>. Add methods: List<Allocation> findByStudentId(Long studentId), List<Allocation> findByRoomId(Long roomId), boolean existsByStudentIdAndRoomId(Long studentId, Long roomId).",
+    "Create backend/src/main/java/com/hostel/mapper/AllocationMapper.java as a MapStruct interface. Use @Mapper(componentModel = \"spring\", uses = CommonConverters.class, builder = @org.mapstruct.Builder(disableBuilder = true)). Define toDto mapping: student.id -> studentId, student.name -> studentName, room.id -> roomId, room.roomNumber -> roomNumber, student.course -> course, assignedOn with qualifiedByName localDateToString, createdAt with qualifiedByName localDateTimeToString. Define toEntity(AllocationDTO dto, Student student, Room room) mapping: ignore id, createdAt, updatedAt; map student from the parameter; map room from the parameter; map assignedOn from dto.assignedOn with qualifiedByName stringToLocalDate. Also define updateEntityFromDto(AllocationDTO dto, @MappingTarget Allocation entity) with @BeanMapping(nullValuePropertyMappingStrategy = IGNORE), ignoring id, student, room, createdAt, updatedAt, and mapping assignedOn from dto.assignedOn with qualifiedByName stringToLocalDate.",
+    "Create backend/src/main/java/com/hostel/service/AllocationService.java. Use @Service @Transactional. Inject AllocationRepository, StudentRepository, RoomRepository, AllocationMapper. Implement: getAllAllocations(Pageable) returning Page<AllocationDTO>, getAllocationById(Long id), createAllocation(AllocationDTO dto) which validates studentId and roomId exist then calls mapper.toEntity(dto, student, room), updateAllocation(Long id, AllocationDTO dto) which loads the allocation and calls mapper.updateEntityFromDto, deleteAllocation(Long id). Throw ResourceNotFoundException when not found, BadRequestException if studentId/roomId missing.",
+    "Create backend/src/main/java/com/hostel/controller/AllocationController.java. @RestController @RequestMapping(\"/api/allocations\"). Endpoints: GET / (paginated, returns Page<AllocationDTO>), GET /{id}, POST / (@PreAuthorize admin/warden, @Valid @RequestBody), PUT /{id} (@PreAuthorize admin/warden), DELETE /{id} (@PreAuthorize admin). Follow same pattern as FeeController.",
+    "Add ALLOCATIONS constant to backend/src/main/java/com/hostel/constants/ApiPaths.java: public static final String ALLOCATIONS = API_PREFIX + \"/allocations\";"
+  ],
+  "acceptance_criteria": [
+    "Backend compiles successfully with mvnw compile (MapStruct generates the AllocationMapperImpl without errors)",
+    "All CRUD endpoints follow the same pattern as FeeController",
+    "AllocationMapper correctly maps nested student/room fields to flat DTO fields"
+  ],
+  "verification": [
+    "Run: cd backend && ./mvnw compile -DskipTests - must succeed without errors",
+    "Verify AllocationMapperImpl is generated in target/generated-sources"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

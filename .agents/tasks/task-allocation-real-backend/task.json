@@ -1,0 +1,7 @@
+{
+  "task_id": "task-allocation-real-backend",
+  "task_description": "Replace the hardcoded Room Allocation page with a real backend-backed implementation. Create the full backend Allocation CRUD (entity, DTO, repository, mapper, service, controller) and rewrite the frontend page to use real API data.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

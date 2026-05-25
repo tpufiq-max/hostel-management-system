@@ -1,0 +1,33 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create complete backend CRUD for Mess Management, Maintenance, Visitors, Notices, and Events - all five new modules with Entity, DTO, Mapper, Repository, Service, and Controller layers following existing patterns exactly.",
+  "status": "in_progress",
+  "steps": [
+    "Create MessMenu entity at backend/src/main/java/com/hostel/entity/MessMenu.java with fields: id, day (enum MON/TUE/WED/THU/FRI/SAT/SUN), mealType (enum BREAKFAST/LUNCH/DINNER/SNACKS), items (String), specialNote, isActive (boolean default true), effectiveFrom (LocalDate), effectiveTo (LocalDate), createdAt, updatedAt. Follow Student.java pattern with @PrePersist/@PreUpdate.",
+    "Create MaintenanceRequest entity at backend/src/main/java/com/hostel/entity/MaintenanceRequest.java with fields: id, title, description, roomNumber, category (enum PLUMBING/ELECTRICAL/FURNITURE/CLEANING/OTHER), priority (enum LOW/MEDIUM/HIGH/CRITICAL), status (enum OPEN/ASSIGNED/IN_PROGRESS/COMPLETED/REJECTED), reportedBy, assignedTo (nullable), reportedDate (LocalDate), completedDate (LocalDate nullable), estimatedCost (BigDecimal nullable), notes, createdAt, updatedAt.",
+    "Create Visitor entity at backend/src/main/java/com/hostel/entity/Visitor.java with fields: id, visitorName, relation (enum PARENT/SIBLING/FRIEND/RELATIVE/GUARDIAN/OTHER), student (ManyToOne FK to Student), purpose, phoneNumber, idProof (String), checkInTime (LocalDateTime), checkOutTime (LocalDateTime nullable), status (enum CHECKED_IN/CHECKED_OUT/REJECTED), approvedBy (nullable), notes, createdAt.",
+    "Create Notice entity at backend/src/main/java/com/hostel/entity/Notice.java with fields: id, title, content (TEXT), category (enum GENERAL/ACADEMIC/HOSTEL/EMERGENCY/EVENT), priority (enum LOW/NORMAL/HIGH/URGENT), publishedBy, publishedAt (LocalDateTime), expiresAt (LocalDateTime nullable), isActive (boolean default true), targetAudience (enum ALL/STUDENTS/STAFF/WARDENS), createdAt, updatedAt.",
+    "Create Event entity at backend/src/main/java/com/hostel/entity/Event.java with fields: id, title, description, eventDate (LocalDate), startTime (LocalTime), endTime (LocalTime), venue, organizer, category (enum CULTURAL/SPORTS/ACADEMIC/SOCIAL/OTHER), status (enum UPCOMING/ONGOING/COMPLETED/CANCELLED), maxParticipants (Integer nullable), registeredCount (Integer default 0), createdAt, updatedAt.",
+    "Create DTOs for all five entities: MessMenuDTO.java, MaintenanceRequestDTO.java, VisitorDTO.java, NoticeDTO.java, EventDTO.java in backend/src/main/java/com/hostel/dto/. Use String for all date/time fields (consistent with StudentDTO pattern). Include @NotBlank on required fields.",
+    "Create Mappers for all five entities: MessMenuMapper.java, MaintenanceRequestMapper.java, VisitorMapper.java, NoticeMapper.java, EventMapper.java in backend/src/main/java/com/hostel/mapper/. Use @Mapper(componentModel='spring', uses=CommonConverters.class, builder=@Builder(disableBuilder=true)). Include toDto, toEntity, updateEntityFromDto methods with proper @Mapping annotations for date conversions and enum handling.",
+    "Create Repositories for all five entities: MessMenuRepository.java, MaintenanceRequestRepository.java, VisitorRepository.java, NoticeRepository.java, EventRepository.java in backend/src/main/java/com/hostel/repository/. Add filter methods: MessMenu findByDay/findByMealType, MaintenanceRequest findByStatus/findByPriority/findByCategory, Visitor findByStatus/findByCheckInTimeBetween, Notice findByIsActiveTrue/findByCategory, Event findByEventDateBetween/findByStatus. Add count methods needed for analytics.",
+    "Create Services for all five entities: MessMenuService.java, MaintenanceRequestService.java, VisitorService.java, NoticeService.java, EventService.java in backend/src/main/java/com/hostel/service/. Follow StudentService pattern with constructor injection, @Transactional, mapper delegation. Include special operations: Maintenance status transitions, Visitor check-in/check-out workflow.",
+    "Create Controllers for all five entities: MessMenuController.java at /api/mess, MaintenanceRequestController.java at /api/maintenance, VisitorController.java at /api/visitors, NoticeController.java at /api/notices, EventController.java at /api/events in backend/src/main/java/com/hostel/controller/. Support GET (list with filters + pagination), GET/{id}, POST, PUT/{id}, DELETE/{id}. Add PUT /api/visitors/{id}/checkout for visitor checkout. All return ResponseEntity<ApiResponse<T>>.",
+    "Add LocalTime conversion methods to CommonConverters.java: stringToLocalTime and localTimeToString (needed for Event entity startTime/endTime)."
+  ],
+  "acceptance_criteria": [
+    "All five entity classes compile with Lombok annotations generating getters/setters/builders",
+    "All five mapper interfaces compile and MapStruct generates implementations with proper date/enum conversion",
+    "All five controllers expose REST endpoints with ApiResponse wrapper",
+    "Backend compiles successfully with mvn compile -DskipTests",
+    "Visitor entity has ManyToOne relationship to Student",
+    "MaintenanceRequest supports status transition via standard PUT",
+    "All enums are defined as inner classes of their respective entities"
+  ],
+  "verification": [
+    "cd /projects/sandbox/hostel-management-system/backend && mvn compile -DskipTests -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 
 /**
@@ -55,6 +56,23 @@ public class CommonConverters {
 
     @Named("localDateTimeToString")
     public String localDateTimeToString(LocalDateTime value) {
+        return value == null ? null : value.toString();
+    }
+
+    // ---------- LocalTime (HH:mm or HH:mm:ss) ----------
+
+    @Named("stringToLocalTime")
+    public LocalTime stringToLocalTime(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalTime.parse(value);
+        } catch (DateTimeParseException ex) {
+            throw new BadRequestException("Invalid time format '" + value + "'. Expected HH:mm or HH:mm:ss.");
+        }
+    }
+
+    @Named("localTimeToString")
+    public String localTimeToString(LocalTime value) {
         return value == null ? null : value.toString();
     }
 

@@ -4,12 +4,18 @@ import NoticeList from '../features/notice/components/NoticeList';
 
 export default function Notice() {
   const [editingNotice, setEditingNotice] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleEditNotice = (notice) => {
     setEditingNotice(notice);
   };
 
   const handleCloseForm = () => {
+    setEditingNotice(null);
+  };
+
+  const handleSaved = () => {
+    setRefreshKey(k => k + 1);
     setEditingNotice(null);
   };
 
@@ -21,11 +27,11 @@ export default function Notice() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1.3fr_0.7fr]">
-        <div className="rounded-3xl border overflow-hidden p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', borderOpacity: 0.2}}>
-          <NoticeForm notice={editingNotice} onClose={handleCloseForm} />
+        <div className="rounded-3xl border overflow-hidden p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)'}}>
+          <NoticeForm notice={editingNotice} onClose={handleCloseForm} onSaved={handleSaved} />
         </div>
-        <div className="rounded-3xl border overflow-hidden p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', borderOpacity: 0.2}}>
-          <NoticeList onEdit={handleEditNotice} />
+        <div className="rounded-3xl border overflow-hidden p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)'}}>
+          <NoticeList onEdit={handleEditNotice} refreshKey={refreshKey} />
         </div>
       </div>
     </div>

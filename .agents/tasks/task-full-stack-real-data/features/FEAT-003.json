@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Rewrite ALL frontend pages that use hardcoded data to use real API calls via service layers. Create proper service files, add loading/error/empty states, search/filter functionality, and pagination. Pages: Mess, Maintenance, Visitor, Notice (NoticeList + NoticeForm components), EventCalendar, Analytics, Reports, StudentProfiles.",
+  "status": "in_progress",
+  "steps": [
+    "Rewrite frontend/features/mess/messService.js to be a full service (following allocationService.js pattern) with methods: list (GET /mess with day/mealType filters), get (GET /mess/{id}), create (POST /mess), update (PUT /mess/{id}), remove (DELETE /mess/{id}). Include unwrap() and normalisePage() helpers.",
+    "Rewrite frontend/pages/Mess.jsx: Remove hardcoded initialMeals array. Add useEffect to fetch from messService.list(). Add loading state (LoadingSkeleton), error state, empty state. Add filter dropdowns for day and mealType that pass to API. Keep the existing card layout and modal form but wire to create/update/delete via service. Use dark theme CSS vars (var(--text), var(--surface), var(--muted), var(--accent)).",
+    "Create frontend/features/maintenance/maintenanceService.js with full CRUD methods: list (GET /maintenance with status/priority/category filters + pagination), get, create, update, remove. Follow allocationService.js pattern.",
+    "Rewrite frontend/pages/Maintenance.jsx: Remove hardcoded requests array. Fetch from maintenanceService. Add loading/error/empty states. Wire the filter tabs to API params. Wire new request form to service.create(). Wire 'Update Status' button to service.update(). Keep existing styling.",
+    "Rewrite frontend/features/visitor/visitorService.js with full CRUD: list (GET /visitors with status filter + pagination), get, create, update, remove, checkout (PUT /visitors/{id}/checkout). Follow allocationService.js pattern.",
+    "Rewrite frontend/pages/Visitor.jsx: Remove hardcoded initialVisitors. Fetch from visitorService. Add loading/error/empty states. Wire form to create/update. Add checkout button that calls visitorService.checkout(). Keep existing table layout and dark theme styling.",
+    "Rewrite frontend/features/notice/noticeService.js with full CRUD: list (GET /notices with category/active filters + pagination), get, create, update, remove.",
+    "Rewrite frontend/features/notice/components/NoticeList.jsx and frontend/features/notice/components/NoticeForm.jsx: Remove hardcoded initialNotices. Fetch from noticeService. Add loading/error/empty states. Wire form submission to create/update. Wire delete to service.remove(). Add category/priority fields to the form.",
+    "Create frontend/features/events/eventService.js with full CRUD: list (GET /events with date range + status filters), get, create, update, remove.",
+    "Rewrite frontend/pages/EventCalendar.jsx: Remove hardcoded events array. Fetch from eventService based on the displayed month range. Populate calendar days with real event data. Wire 'Add Event' button to a modal form that calls service.create(). Add loading state.",
+    "Create frontend/features/analytics/analyticsService.js with methods: getSummary (GET /analytics/summary), getRevenue (GET /analytics/revenue), getOccupancy (GET /analytics/occupancy), getComplaints (GET /analytics/complaints), getAttendance (GET /analytics/attendance).",
+    "Rewrite frontend/pages/Analytics.jsx: Remove setTimeout fake data. Fetch from analyticsService. Wire time range buttons to API params. Display real data in the existing chart/card layout. Keep loading skeleton.",
+    "Rewrite frontend/features/reports/reportService.js to fetch from dashboard/analytics endpoints: getReportData (combines dashboard stats + analytics summary).",
+    "Rewrite frontend/pages/Reports.jsx: Remove hardcoded reportCards array. Fetch real stats from reportService. Display real values for occupancy rate, fee collection, pending complaints, visitor count.",
+    "Rewrite frontend/pages/StudentProfiles.jsx: Remove hardcoded students array. Import and use the existing student service (frontend/features/student/ if exists, else create). Fetch paginated students from GET /students. Wire search to GET /students/search?query=. Add loading/empty states. Keep existing profile card UI."
+  ],
+  "acceptance_criteria": [
+    "No frontend page contains hardcoded demo data arrays",
+    "All pages have loading states (LoadingSkeleton component or similar)",
+    "All pages have error handling (try/catch with user-visible error messages)",
+    "All pages have empty states when no data is returned",
+    "All service files follow the allocationService.js pattern with unwrap() helper",
+    "Frontend builds successfully with npm run build",
+    "All pages use var(--text), var(--surface), var(--muted), var(--accent) for dark theme compatibility"
+  ],
+  "verification": [
+    "cd /projects/sandbox/hostel-management-system/frontend && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

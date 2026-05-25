@@ -1,123 +1,216 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React, { useContext, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
+import { AuthContext } from "../context/AuthContext";
+import { ThemeContext } from "../context/ThemeContext";
+
+/**
+ * Login page.
+ *
+ * F1 scope: wire to the real backend via AuthContext.login. The visual design
+ * stays minimal — a polished redesign comes in a later PR (F8).
+ */
 export default function Login() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
   const { login } = useContext(AuthContext);
+  const { isDark, toggleTheme } = useContext(ThemeContext);
+
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from?.pathname || "/";
+
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    if (error) setError('');
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError("");
 
     try {
-      await login(formData.email, formData.password);
-      navigate('/');
+      await login(formData.email.trim(), formData.password);
+      navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      // The api layer normalises errors to { message, status, errors }.
+      setError(err?.message || "Sign-in failed. Please try again.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4">
-      <div className="max-w-md w-full">
-        {/* Logo/Brand */}
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--bg-primary, #f1f5f9)" }}
+    >
+      {/* Theme toggle in the corner */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+        className="fixed top-5 right-5 px-3 py-2 rounded-lg text-sm border transition-colors"
+        style={{
+          borderColor: "var(--border-color)",
+          background: "var(--bg-secondary)",
+          color: "var(--text-primary)",
+        }}
+      >
+        {isDark ? "☀️ Light" : "🌙 Dark"}
+      </button>
+
+      <div className="w-full max-w-md">
+        {/* Brand header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-              <path d="M3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524zm6.07-8.955L9.368 8.11a3 3 0 01-2.735 0L3.07 6.57l6.23-2.675 6 2.573z" />
-            </svg>
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg text-white text-3xl"
+            style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
+          >
+            🏠
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Hostel Management</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1
+            className="text-2xl font-bold mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Hostel Management
+          </h1>
+          <p style={{ color: "var(--text-secondary)" }}>Sign in to your account</p>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
+        {/* Card */}
+        <div
+          className="rounded-2xl shadow-xl p-8"
+          style={{
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border-color)",
+            boxShadow: "var(--card-shadow)",
+          }}
+        >
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Email Address
               </label>
               <input
-                type="email"
                 id="email"
                 name="email"
+                type="email"
+                autoComplete="email"
+                required
                 value={formData.email}
                 onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Enter your email"
+                placeholder="you@example.com"
+                className="w-full px-4 py-3 rounded-lg outline-none transition-colors"
+                style={{
+                  background: "var(--bg-primary)",
+                  border: `1px solid ${error ? "#ef4444" : "var(--border-color)"}`,
+                  color: "var(--text-primary)",
+                }}
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Password
               </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 pr-12 rounded-lg outline-none transition-colors"
+                  style={{
+                    background: "var(--bg-primary)",
+                    border: `1px solid ${error ? "#ef4444" : "var(--border-color)"}`,
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {showPassword ? "🙈" : "👁️"}
+                </button>
+              </div>
             </div>
 
-            {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
+              <div
+                role="alert"
+                className="rounded-lg p-3 text-sm flex items-start gap-2"
+                style={{
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  color: "#ef4444",
+                }}
+              >
+                <span>⚠️</span>
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              disabled={submitting}
+              className="w-full font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-white"
+              style={{
+                background: submitting
+                  ? "rgba(59, 130, 246, 0.7)"
+                  : "linear-gradient(135deg, #3b82f6, #6366f1)",
+                boxShadow: submitting
+                  ? "none"
+                  : "0 4px 14px rgba(59, 130, 246, 0.35)",
+              }}
             >
-              {loading ? (
+              {submitting ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Signing in...
+                  <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  Signing in…
                 </>
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </button>
           </form>
+
+          <p
+            className="mt-6 text-xs text-center"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Forgot your password? Contact your administrator.
+          </p>
         </div>
+
+        <p
+          className="text-center mt-6 text-xs"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Hostel Management System &copy; {new Date().getFullYear()}
+        </p>
       </div>
     </div>
   );

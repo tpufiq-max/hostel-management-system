@@ -4,11 +4,13 @@ export const APP_VERSION = "1.0.0";
 
 // ─── API Base URL ───────────────────────────────────────────────────────────────
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 // ─── Auth ───────────────────────────────────────────────────────────────────────
-export const TOKEN_KEY = "hms_token";
-export const USER_KEY  = "hms_user";
+// Storage keys (must match those used in api/api.js tokenService)
+export const ACCESS_TOKEN_KEY  = "hms_access_token";
+export const REFRESH_TOKEN_KEY = "hms_refresh_token";
+export const USER_KEY          = "hms_user";
 
 // ─── Roles ──────────────────────────────────────────────────────────────────────
 export const ROLES = {

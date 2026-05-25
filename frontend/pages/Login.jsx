@@ -1,131 +1,399 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React, { useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import { ThemeContext } from "../context/ThemeContext";
+import { useNotification } from "../context/NotificationContext";
+
+const DEMO_ACCOUNTS = [
+  { label: "Admin",   email: "admin@hostel.com",   password: "admin123",   tone: "accent"  },
+  { label: "Student", email: "student@hostel.com", password: "student123", tone: "success" },
+];
 
 export default function Login() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { login, isAuthenticated } = useContext(AuthContext);
+  const { isDark, toggleTheme }     = useContext(ThemeContext);
+  const toast                       = useNotification();
+  const navigate                    = useNavigate();
 
-  const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const [form, setForm]         = useState({ email: "", password: "" });
+  const [showPassword, setShow] = useState(false);
+  const [error, setError]       = useState("");
+  const [busy, setBusy]         = useState(false);
 
-  const handleChange = (e) => {
+  // If already authenticated (e.g. user hits /login while logged in), redirect home.
+  useEffect(() => {
+    if (isAuthenticated) navigate("/", { replace: true });
+  }, [isAuthenticated, navigate]);
+
+  function handleChange(e) {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    if (error) setError('');
-  };
+    setForm((f) => ({ ...f, [name]: value }));
+    if (error) setError("");
+  }
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-
+    if (busy) return;
+    setBusy(true);
+    setError("");
     try {
-      await login(formData.email, formData.password);
-      navigate('/');
+      const user = await login(form.email.trim(), form.password);
+      toast.success(`Welcome back, ${user.name}`);
+      navigate("/", { replace: true });
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      const msg = err?.message || "Login failed. Please try again.";
+      setError(msg);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
+  }
+
+  function fillDemo(acc) {
+    setForm({ email: acc.email, password: acc.password });
+    setError("");
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4">
-      <div className="max-w-md w-full">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-              <path d="M3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524zm6.07-8.955L9.368 8.11a3 3 0 01-2.735 0L3.07 6.57l6.23-2.675 6 2.573z" />
-            </svg>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        background: "var(--bg)",
+        color: "var(--text)",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      {/* Theme toggle */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label="Toggle theme"
+        style={{
+          position: "fixed",
+          top: 20,
+          right: 20,
+          padding: "8px 14px",
+          borderRadius: 10,
+          border: "1px solid var(--border)",
+          background: "var(--surface)",
+          color: "var(--text)",
+          fontSize: 13,
+          cursor: "pointer",
+        }}
+      >
+        {isDark ? "Light mode" : "Dark mode"}
+      </button>
+
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          animation: "slideUp 0.4s ease both",
+        }}
+      >
+        {/* Brand */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div
+            aria-hidden="true"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              background: "linear-gradient(135deg, var(--accent), var(--purple))",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              fontWeight: 700,
+              margin: "0 auto 14px",
+              boxShadow: "0 8px 24px rgba(59,130,246,0.35)",
+            }}
+          >
+            HMS
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Hostel Management</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: -0.3,
+            }}
+          >
+            Hostel Management
+          </h1>
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: 13,
+              color: "var(--muted)",
+            }}
+          >
+            Sign in to your account
+          </p>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-[var(--bg-secondary)] rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
+        {/* Card */}
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 16,
+            padding: 24,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+          }}
+        >
+          {/* Demo creds quick-fill */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 20,
+            }}
+          >
+            {DEMO_ACCOUNTS.map((a) => {
+              const color = a.tone === "accent" ? "var(--accent)" : "var(--success)";
+              return (
+                <button
+                  key={a.label}
+                  type="button"
+                  onClick={() => fillDemo(a)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: `1px solid ${color}55`,
+                    background: "transparent",
+                    color,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Use {a.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <Field
+              label="Email address"
+              htmlFor="login-email"
+              error={error}
+            >
               <input
-                type="email"
-                id="email"
+                id="login-email"
                 name="email"
-                value={formData.email}
-                onChange={handleChange}
+                type="email"
+                autoComplete="email"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
+                value={form.email}
                 onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Enter your password"
+                placeholder="you@example.com"
+                disabled={busy}
+                style={inputStyle(!!error)}
               />
-            </div>
+            </Field>
 
-            {/* Error Message */}
+            <Field
+              label="Password"
+              htmlFor="login-password"
+              error={error}
+            >
+              <div style={{ position: "relative" }}>
+                <input
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  disabled={busy}
+                  style={{
+                    ...inputStyle(!!error),
+                    paddingRight: 56,
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShow((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    padding: "4px 10px",
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--muted)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </Field>
+
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-sm text-red-700">{error}</p>
-                </div>
+              <div
+                role="alert"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.35)",
+                  color: "var(--danger)",
+                  fontSize: 13,
+                }}
+              >
+                {error}
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              disabled={busy}
+              style={{
+                marginTop: 4,
+                padding: "12px",
+                borderRadius: 12,
+                border: "none",
+                background: busy
+                  ? "var(--muted)"
+                  : "linear-gradient(135deg, var(--accent), var(--purple))",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: busy ? "not-allowed" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                opacity: busy ? 0.85 : 1,
+                transition: "opacity 0.2s",
+              }}
             >
-              {loading ? (
+              {busy ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Signing in...
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,0.4)",
+                      borderTopColor: "#fff",
+                      animation: "spin 0.7s linear infinite",
+                    }}
+                  />
+                  Signing in…
                 </>
               ) : (
-                'Sign In'
+                "Sign in"
               )}
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-            <p className="text-xs text-blue-700">Email: admin@hostel.com</p>
-            <p className="text-xs text-blue-700">Password: admin123</p>
+          {/* Demo info */}
+          <div
+            style={{
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: "1px solid var(--border)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+            }}
+          >
+            {DEMO_ACCOUNTS.map((a) => (
+              <div
+                key={a.label}
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  fontSize: 12,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {a.label}
+                </div>
+                <div style={{ color: "var(--muted)", lineHeight: 1.5, wordBreak: "break-all" }}>
+                  {a.email}
+                  <br />
+                  {a.password}
+                </div>
+              </div>
+            ))}
           </div>
+        </div>
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 18,
+            fontSize: 11,
+            color: "var(--muted)",
+          }}
+        >
+          Hostel Management System © 2025
         </div>
       </div>
     </div>
   );
+}
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+function Field({ label, htmlFor, children }) {
+  return (
+    <div>
+      <label
+        htmlFor={htmlFor}
+        style={{
+          display: "block",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--muted)",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function inputStyle(hasError) {
+  return {
+    width: "100%",
+    padding: "11px 12px",
+    borderRadius: 10,
+    border: `1px solid ${hasError ? "var(--danger)" : "var(--border)"}`,
+    background: "var(--card)",
+    color: "var(--text)",
+    fontSize: 14,
+    outline: "none",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+  };
 }

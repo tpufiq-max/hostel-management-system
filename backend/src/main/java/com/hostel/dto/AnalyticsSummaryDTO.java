@@ -16,6 +16,7 @@ public class AnalyticsSummaryDTO {
     private double totalRevenue;
     private double pendingFees;
     private long openComplaints;
+    private long resolvedComplaints;
     private long activeVisitors;
     private long openMaintenanceRequests;
     private long activeNotices;

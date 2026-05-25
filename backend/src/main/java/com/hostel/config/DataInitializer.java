@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -59,6 +60,7 @@ public class DataInitializer {
     private String adminPhone;
 
     @Bean
+    @Order(1)
     CommandLineRunner initData(UserRepository userRepository,
                                PasswordEncoder passwordEncoder,
                                Environment env) {

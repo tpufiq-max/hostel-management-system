@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Notices", description = "Notice management")
@@ -45,16 +46,19 @@ public class NoticeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<NoticeDTO>> createNotice(@Valid @RequestBody NoticeDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Notice created successfully", noticeService.createNotice(dto)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<NoticeDTO>> updateNotice(@PathVariable @NonNull Long id, @RequestBody NoticeDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Notice updated successfully", noticeService.updateNotice(id, dto)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteNotice(@PathVariable @NonNull Long id) {
         noticeService.deleteNotice(id);
         return ResponseEntity.ok(ApiResponse.success("Notice deleted successfully", null));

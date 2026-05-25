@@ -2,6 +2,7 @@ package com.hostel.controller;
 
 import com.hostel.dto.ApiResponse;
 import com.hostel.dto.EventDTO;
+import com.hostel.exception.BadRequestException;
 import com.hostel.service.EventService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -10,9 +11,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @Tag(name = "Events", description = "Event management")
 @RestController
@@ -38,7 +41,13 @@ public class EventController {
         } else if (category != null) {
             result = eventService.getEventsByCategory(category, pageable);
         } else if (startDate != null && endDate != null) {
-            result = eventService.getEventsByDateRange(LocalDate.parse(startDate), LocalDate.parse(endDate), pageable);
+            try {
+                LocalDate start = LocalDate.parse(startDate);
+                LocalDate end = LocalDate.parse(endDate);
+                result = eventService.getEventsByDateRange(start, end, pageable);
+            } catch (DateTimeParseException ex) {
+                throw new BadRequestException("Invalid date format. Expected YYYY-MM-DD.");
+            }
         } else {
             result = eventService.getAllEvents(pageable);
         }
@@ -51,16 +60,19 @@ public class EventController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<EventDTO>> createEvent(@Valid @RequestBody EventDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Event created successfully", eventService.createEvent(dto)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<EventDTO>> updateEvent(@PathVariable @NonNull Long id, @RequestBody EventDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Event updated successfully", eventService.updateEvent(id, dto)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteEvent(@PathVariable @NonNull Long id) {
         eventService.deleteEvent(id);
         return ResponseEntity.ok(ApiResponse.success("Event deleted successfully", null));

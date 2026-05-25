@@ -70,7 +70,7 @@ export default function Analytics() {
   const monthlyRevenue = Array.isArray(revenue?.monthlyRevenue) ? revenue.monthlyRevenue : (Array.isArray(revenue) ? revenue : []);
 
   // Complaints breakdown
-  const complaintsByCategory = complaints?.byCategory ? Object.entries(complaints.byCategory) : [];
+  const complaintsByCategory = Array.isArray(complaints?.categoryBreakdown) ? complaints.categoryBreakdown.map(item => [item.category, item.count]) : [];
   const totalComplaintCount = complaintsByCategory.reduce((sum, [, count]) => sum + count, 0) || 1;
 
   return (

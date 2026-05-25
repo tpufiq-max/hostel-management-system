@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Visitors", description = "Visitor management")
@@ -42,21 +43,25 @@ public class VisitorController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<VisitorDTO>> createVisitor(@Valid @RequestBody VisitorDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Visitor checked in successfully", visitorService.createVisitor(dto)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<VisitorDTO>> updateVisitor(@PathVariable @NonNull Long id, @RequestBody VisitorDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Visitor updated successfully", visitorService.updateVisitor(id, dto)));
     }
 
     @PutMapping("/{id}/checkout")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<VisitorDTO>> checkoutVisitor(@PathVariable @NonNull Long id) {
         return ResponseEntity.ok(ApiResponse.success("Visitor checked out successfully", visitorService.checkoutVisitor(id)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteVisitor(@PathVariable @NonNull Long id) {
         visitorService.deleteVisitor(id);
         return ResponseEntity.ok(ApiResponse.success("Visitor deleted successfully", null));

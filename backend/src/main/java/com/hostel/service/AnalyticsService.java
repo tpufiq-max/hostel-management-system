@@ -51,6 +51,7 @@ public class AnalyticsService {
         double totalRevenue = feeRepository.getTotalRevenue();
         double pendingFees = feeRepository.getPendingAmount();
         long openComplaints = complaintRepository.countByComplaintStatus(Complaint.ComplaintStatus.OPEN);
+        long resolvedComplaints = complaintRepository.countByComplaintStatus(Complaint.ComplaintStatus.RESOLVED);
         long activeVisitors = visitorRepository.countByStatus(Visitor.Status.CHECKED_IN);
         long openMaintenanceRequests = maintenanceRequestRepository.countByStatus(MaintenanceRequest.Status.OPEN);
         long activeNotices = noticeRepository.countByIsActiveTrue();
@@ -63,6 +64,7 @@ public class AnalyticsService {
                 .totalRevenue(totalRevenue)
                 .pendingFees(pendingFees)
                 .openComplaints(openComplaints)
+                .resolvedComplaints(resolvedComplaints)
                 .activeVisitors(activeVisitors)
                 .openMaintenanceRequests(openMaintenanceRequests)
                 .activeNotices(activeNotices)
@@ -75,10 +77,15 @@ public class AnalyticsService {
         double totalRevenue = feeRepository.getTotalRevenue();
 
         List<RevenueAnalyticsDTO.MonthlyRevenue> monthlyRevenue = monthlyData.stream()
-                .map(row -> RevenueAnalyticsDTO.MonthlyRevenue.builder()
-                        .month(String.valueOf(row[0]))
-                        .amount(((Number) row[1]).doubleValue())
-                        .build())
+                .map(row -> {
+                    int year = ((Number) row[0]).intValue();
+                    int month = ((Number) row[1]).intValue();
+                    String monthStr = String.format("%d-%02d", year, month);
+                    return RevenueAnalyticsDTO.MonthlyRevenue.builder()
+                            .month(monthStr)
+                            .amount(((Number) row[2]).doubleValue())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return RevenueAnalyticsDTO.builder()

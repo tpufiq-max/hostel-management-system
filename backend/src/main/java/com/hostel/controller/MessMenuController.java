@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Mess Menu", description = "Mess menu management")
@@ -47,16 +48,19 @@ public class MessMenuController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<MessMenuDTO>> createMenu(@Valid @RequestBody MessMenuDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Menu created successfully", messMenuService.createMenu(dto)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<MessMenuDTO>> updateMenu(@PathVariable @NonNull Long id, @RequestBody MessMenuDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Menu updated successfully", messMenuService.updateMenu(id, dto)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteMenu(@PathVariable @NonNull Long id) {
         messMenuService.deleteMenu(id);
         return ResponseEntity.ok(ApiResponse.success("Menu deleted successfully", null));

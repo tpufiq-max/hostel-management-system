@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Maintenance Requests", description = "Maintenance request management")
@@ -48,16 +49,19 @@ public class MaintenanceRequestController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<MaintenanceRequestDTO>> createRequest(@Valid @RequestBody MaintenanceRequestDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Maintenance request created successfully", maintenanceRequestService.createRequest(dto)));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('WARDEN')")
     public ResponseEntity<ApiResponse<MaintenanceRequestDTO>> updateRequest(@PathVariable @NonNull Long id, @RequestBody MaintenanceRequestDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Maintenance request updated successfully", maintenanceRequestService.updateRequest(id, dto)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteRequest(@PathVariable @NonNull Long id) {
         maintenanceRequestService.deleteRequest(id);
         return ResponseEntity.ok(ApiResponse.success("Maintenance request deleted successfully", null));

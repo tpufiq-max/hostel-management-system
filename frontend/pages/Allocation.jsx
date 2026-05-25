@@ -126,6 +126,9 @@ export default function Allocation() {
   };
 
   const handleDeleteAllocation = async (id) => {
+    if (!window.confirm("Are you sure you want to remove this allocation?")) {
+      return;
+    }
     try {
       await allocationService.remove(id);
       await refreshAllocations();

@@ -1,361 +1,447 @@
-import React, { useState, useEffect } from 'react';
+// StudentForm
+// ──────────────────────────────────────────────────────────────────────────────
+// Field names match the backend StudentDTO exactly so we never have to do
+// awkward translations on submit:
+//   name, email, phone, rollNumber, course, department, year (1-4),
+//   roomNumber, bedNumber, dateOfBirth (yyyy-mm-dd), gender, bloodGroup,
+//   guardianName, guardianPhone, address, feesStatus (PAID|PENDING|OVERDUE),
+//   isActive, admissionDate (yyyy-mm-dd)
+//
+// `error` (from the parent) carries the normalised API error object after a
+// failed save, which we render at the bottom of the form.
 
-export default function StudentForm({ student, onClose, onSubmit }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    room: '',
-    course: '',
-    year: '',
-    status: 'Active',
-    emergencyContact: '',
-    address: '',
-    joinDate: new Date().toISOString().split('T')[0]
-  });
+import React, { useContext, useEffect, useState } from "react";
+import { ThemeContext } from "../../../context/ThemeContext";
 
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const FEE_STATUS = ["PENDING", "PAID", "OVERDUE"];
+const YEARS      = [1, 2, 3, 4, 5];
+const GENDERS    = ["Male", "Female", "Other"];
 
+const EMPTY = {
+  name:           "",
+  email:          "",
+  phone:          "",
+  rollNumber:     "",
+  course:         "",
+  department:     "",
+  year:           "",
+  roomNumber:     "",
+  bedNumber:      "",
+  dateOfBirth:    "",
+  gender:         "",
+  bloodGroup:     "",
+  guardianName:   "",
+  guardianPhone:  "",
+  address:        "",
+  feesStatus:     "PENDING",
+  isActive:       true,
+  admissionDate:  new Date().toISOString().slice(0, 10),
+};
+
+export default function StudentForm({ student, onClose, onSubmit, error: serverError }) {
+  const { t } = useContext(ThemeContext);
+
+  const isEdit = Boolean(student?.id);
+
+  const [formData, setFormData] = useState(EMPTY);
+  const [errors, setErrors]     = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  // Hydrate from the row passed in for editing
   useEffect(() => {
-    if (student) {
-      setFormData({
-        name: student.name || '',
-        email: student.email || '',
-        phone: student.phone || '',
-        room: student.room || '',
-        course: student.course || '',
-        year: student.year || '',
-        status: student.status || 'Active',
-        emergencyContact: student.emergencyContact || '',
-        address: student.address || '',
-        joinDate: student.joinDate || new Date().toISOString().split('T')[0]
-      });
-    }
-  }, [student]);
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Full name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    // Phone validation
-    const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!phoneRegex.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-
-    // Room validation
-    if (!formData.room.trim()) {
-      newErrors.room = 'Room number is required';
-    }
-
-    // Course validation
-    if (!formData.course) {
-      newErrors.course = 'Please select a course';
-    }
-
-    // Year validation
-    if (!formData.year) {
-      newErrors.year = 'Please select a year';
-    }
-
-    // Emergency contact validation
-    if (!formData.emergencyContact.trim()) {
-      newErrors.emergencyContact = 'Emergency contact is required';
-    }
-
-    // Address validation
-    if (!formData.address.trim()) {
-      newErrors.address = 'Address is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
+    if (!student) {
+      setFormData(EMPTY);
       return;
     }
+    setFormData({
+      ...EMPTY,
+      ...student,
+      year:           student.year ?? "",
+      isActive:       student.isActive !== false,
+      feesStatus:     student.feesStatus || "PENDING",
+      // Date fields can come back as either yyyy-mm-dd strings or full ISO
+      // strings; trim to yyyy-mm-dd for the date input.
+      dateOfBirth:    (student.dateOfBirth   || "").slice(0, 10),
+      admissionDate:  (student.admissionDate || "").slice(0, 10),
+    });
+  }, [student]);
 
-    setIsSubmitting(true);
+  function setField(name, value) {
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: undefined }));
+  }
 
+  function validate() {
+    const e = {};
+    if (!formData.name?.trim())  e.name  = "Name is required";
+    if (!formData.email?.trim()) e.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      e.email = "Email is not valid";
+
+    if (formData.year && (Number(formData.year) < 1 || Number(formData.year) > 5))
+      e.year = "Year must be between 1 and 5";
+
+    if (formData.guardianPhone && !/^[+\-()\s\d]{6,20}$/.test(formData.guardianPhone))
+      e.guardianPhone = "Phone format looks invalid";
+    if (formData.phone && !/^[+\-()\s\d]{6,20}$/.test(formData.phone))
+      e.phone = "Phone format looks invalid";
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    if (submitting) return;
+    if (!validate()) return;
+
+    const payload = {
+      ...formData,
+      // Send empty strings as undefined so backend partial-update logic
+      // (NullValuePropertyMappingStrategy.IGNORE) keeps existing values.
+      ...Object.fromEntries(
+        Object.entries(formData).map(([k, v]) =>
+          v === "" ? [k, null] : [k, v]
+        )
+      ),
+      year: formData.year === "" ? null : Number(formData.year),
+    };
+
+    setSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const studentData = {
-        ...formData,
-        id: student?.id || Date.now(),
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        room: formData.room.trim(),
-        emergencyContact: formData.emergencyContact.trim(),
-        address: formData.address.trim()
-      };
-
-      if (onSubmit) {
-        onSubmit(studentData);
-      }
-
-      onClose();
-    } catch (error) {
-      console.error('Error submitting form:', error);
+      await onSubmit(payload);
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
+  }
+
+  // ── styles helpers ─────────────────────────────────────────────────────────
+  const inputStyle = (hasError) => ({
+    width:        "100%",
+    padding:      "10px 12px",
+    borderRadius: 10,
+    border:       `1px solid ${hasError ? t.danger : t.border}`,
+    background:   t.card,
+    color:        t.text,
+    fontSize:     14,
+    outline:      "none",
+    transition:   "border-color 0.2s",
+  });
+
+  const labelStyle = {
+    display:    "block",
+    fontSize:   12,
+    fontWeight: 600,
+    color:      t.muted,
+    marginBottom: 6,
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
+  const sectionTitleStyle = {
+    fontSize:    11,
+    fontWeight:  700,
+    color:       t.muted,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 12,
+    marginTop:    20,
   };
 
+  // ── JSX ────────────────────────────────────────────────────────────────────
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Basic Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-            Full Name *
-          </label>
+    <form onSubmit={handleSubmit} noValidate>
+      {/* ── Identity ──────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Identity</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Field label="Full name *" error={errors.name}>
           <input
-            type="text"
-            id="name"
-            name="name"
             value={formData.name}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.name ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter full name"
+            onChange={(e) => setField("name", e.target.value)}
+            placeholder="e.g. Priya Sharma"
+            style={inputStyle(errors.name)}
+            autoFocus
           />
-          {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address *
-          </label>
+        </Field>
+        <Field label="Email *" error={errors.email}>
           <input
             type="email"
-            id="email"
-            name="email"
             value={formData.email}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter email address"
+            onChange={(e) => setField("email", e.target.value)}
+            placeholder="student@example.com"
+            style={inputStyle(errors.email)}
           />
-          {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number *
-          </label>
+        </Field>
+        <Field label="Roll number">
           <input
-            type="tel"
-            id="phone"
-            name="phone"
+            value={formData.rollNumber}
+            onChange={(e) => setField("rollNumber", e.target.value)}
+            placeholder="e.g. 2024001"
+            style={inputStyle(false)}
+          />
+        </Field>
+        <Field label="Phone" error={errors.phone}>
+          <input
             value={formData.phone}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.phone ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter phone number"
+            onChange={(e) => setField("phone", e.target.value)}
+            placeholder="+91 98765 43210"
+            style={inputStyle(errors.phone)}
           />
-          {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
-        </div>
+        </Field>
+      </div>
 
-        <div>
-          <label htmlFor="emergencyContact" className="block text-sm font-medium text-gray-700 mb-2">
-            Emergency Contact *
-          </label>
+      {/* ── Academic ─────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Academic</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px", gap: 14 }}>
+        <Field label="Course">
           <input
-            type="tel"
-            id="emergencyContact"
-            name="emergencyContact"
-            value={formData.emergencyContact}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.emergencyContact ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter emergency contact number"
+            value={formData.course}
+            onChange={(e) => setField("course", e.target.value)}
+            placeholder="e.g. B.Tech CSE"
+            style={inputStyle(false)}
           />
-          {errors.emergencyContact && <p className="mt-1 text-sm text-red-600">{errors.emergencyContact}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="room" className="block text-sm font-medium text-gray-700 mb-2">
-            Room Number *
-          </label>
+        </Field>
+        <Field label="Department">
           <input
-            type="text"
-            id="room"
-            name="room"
-            value={formData.room}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.room ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-            placeholder="Enter room number"
+            value={formData.department}
+            onChange={(e) => setField("department", e.target.value)}
+            placeholder="e.g. Engineering"
+            style={inputStyle(false)}
           />
-          {errors.room && <p className="mt-1 text-sm text-red-600">{errors.room}</p>}
-        </div>
+        </Field>
+        <Field label="Year" error={errors.year}>
+          <select
+            value={formData.year}
+            onChange={(e) => setField("year", e.target.value)}
+            style={inputStyle(errors.year)}
+          >
+            <option value="">—</option>
+            {YEARS.map(y => <option key={y} value={y}>Year {y}</option>)}
+          </select>
+        </Field>
+      </div>
 
-        <div>
-          <label htmlFor="joinDate" className="block text-sm font-medium text-gray-700 mb-2">
-            Join Date
-          </label>
+      {/* ── Hostel ───────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Hostel</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+        <Field label="Room number">
+          <input
+            value={formData.roomNumber}
+            onChange={(e) => setField("roomNumber", e.target.value)}
+            placeholder="e.g. 101"
+            style={inputStyle(false)}
+          />
+        </Field>
+        <Field label="Bed number">
+          <input
+            value={formData.bedNumber}
+            onChange={(e) => setField("bedNumber", e.target.value)}
+            placeholder="e.g. A"
+            style={inputStyle(false)}
+          />
+        </Field>
+        <Field label="Admission date">
           <input
             type="date"
-            id="joinDate"
-            name="joinDate"
-            value={formData.joinDate}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            value={formData.admissionDate}
+            onChange={(e) => setField("admissionDate", e.target.value)}
+            style={inputStyle(false)}
           />
-        </div>
-
-        <div>
-          <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-2">
-            Course *
-          </label>
-          <select
-            id="course"
-            name="course"
-            value={formData.course}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.course ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-          >
-            <option value="">Select course</option>
-            <option value="Computer Science">Computer Science</option>
-            <option value="Mechanical Engineering">Mechanical Engineering</option>
-            <option value="Electrical Engineering">Electrical Engineering</option>
-            <option value="Civil Engineering">Civil Engineering</option>
-            <option value="Business Administration">Business Administration</option>
-            <option value="Information Technology">Information Technology</option>
-            <option value="Chemical Engineering">Chemical Engineering</option>
-          </select>
-          {errors.course && <p className="mt-1 text-sm text-red-600">{errors.course}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
-            Year *
-          </label>
-          <select
-            id="year"
-            name="year"
-            value={formData.year}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.year ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
-          >
-            <option value="">Select year</option>
-            <option value="1st Year">1st Year</option>
-            <option value="2nd Year">2nd Year</option>
-            <option value="3rd Year">3rd Year</option>
-            <option value="4th Year">4th Year</option>
-          </select>
-          {errors.year && <p className="mt-1 text-sm text-red-600">{errors.year}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-            Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          >
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
-        </div>
+        </Field>
       </div>
 
-      {/* Address */}
-      <div>
-        <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
-          Address *
-        </label>
+      {/* ── Personal ─────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Personal</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+        <Field label="Date of birth">
+          <input
+            type="date"
+            value={formData.dateOfBirth}
+            onChange={(e) => setField("dateOfBirth", e.target.value)}
+            style={inputStyle(false)}
+          />
+        </Field>
+        <Field label="Gender">
+          <select
+            value={formData.gender}
+            onChange={(e) => setField("gender", e.target.value)}
+            style={inputStyle(false)}
+          >
+            <option value="">—</option>
+            {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </Field>
+        <Field label="Blood group">
+          <input
+            value={formData.bloodGroup}
+            onChange={(e) => setField("bloodGroup", e.target.value)}
+            placeholder="e.g. O+"
+            style={inputStyle(false)}
+          />
+        </Field>
+      </div>
+
+      {/* ── Guardian ─────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Guardian</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <Field label="Guardian name">
+          <input
+            value={formData.guardianName}
+            onChange={(e) => setField("guardianName", e.target.value)}
+            placeholder="Parent / guardian"
+            style={inputStyle(false)}
+          />
+        </Field>
+        <Field label="Guardian phone" error={errors.guardianPhone}>
+          <input
+            value={formData.guardianPhone}
+            onChange={(e) => setField("guardianPhone", e.target.value)}
+            placeholder="+91 98765 43210"
+            style={inputStyle(errors.guardianPhone)}
+          />
+        </Field>
+      </div>
+      <Field label="Address">
         <textarea
-          id="address"
-          name="address"
           value={formData.address}
-          onChange={handleChange}
-          rows={3}
-          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-            errors.address ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-          }`}
-          placeholder="Enter full address"
+          onChange={(e) => setField("address", e.target.value)}
+          rows={2}
+          placeholder="Street, city, state, pincode"
+          style={{ ...inputStyle(false), resize: "vertical" }}
         />
-        {errors.address && <p className="mt-1 text-sm text-red-600">{errors.address}</p>}
+      </Field>
+
+      {/* ── Status ───────────────────────────────────────────────────────── */}
+      <div style={sectionTitleStyle}>Status</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "end" }}>
+        <Field label="Fees status">
+          <select
+            value={formData.feesStatus}
+            onChange={(e) => setField("feesStatus", e.target.value)}
+            style={inputStyle(false)}
+          >
+            {FEE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <label style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 12px", borderRadius: 10,
+          border: `1px solid ${t.border}`, background: t.card,
+          cursor: "pointer",
+        }}>
+          <input
+            type="checkbox"
+            checked={!!formData.isActive}
+            onChange={(e) => setField("isActive", e.target.checked)}
+            style={{ accentColor: t.accent, width: 16, height: 16 }}
+          />
+          <span style={{ fontSize: 14, color: t.text }}>
+            {formData.isActive ? "Active" : "Inactive"}
+          </span>
+        </label>
       </div>
 
-      {/* Form Actions */}
-      <div className="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
+      {/* ── Server error ─────────────────────────────────────────────────── */}
+      {serverError && (
+        <div role="alert" style={{
+          marginTop: 18,
+          padding:   "10px 14px",
+          background: `${t.danger}1a`,
+          border:     `1px solid ${t.danger}55`,
+          borderRadius: 10,
+          color:      t.danger,
+          fontSize:   13,
+        }}>
+          {serverError.message || "Failed to save student."}
+          {Array.isArray(serverError.errors) && serverError.errors.length > 0 && (
+            <ul style={{ marginTop: 6, marginLeft: 16 }}>
+              {serverError.errors.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 10,
+        marginTop: 22,
+        paddingTop: 16,
+        borderTop: `1px solid ${t.border}`,
+      }}>
         <button
           type="button"
           onClick={onClose}
-          disabled={isSubmitting}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={submitting}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: `1px solid ${t.border}`,
+            background: t.surface,
+            color: t.text,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: submitting ? "not-allowed" : "pointer",
+            opacity: submitting ? 0.6 : 1,
+          }}
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          disabled={submitting}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "none",
+            background: t.accent,
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: submitting ? "wait" : "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}
         >
-          {isSubmitting && (
-            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+          {submitting && (
+            <span style={{
+              display: "inline-block",
+              width: 14, height: 14,
+              border: "2px solid rgba(255,255,255,0.4)",
+              borderTopColor: "#fff",
+              borderRadius: "50%",
+              animation: "hms-spin 0.7s linear infinite",
+            }} />
           )}
-          {student ? 'Update Student' : 'Add Student'}
+          {isEdit ? (submitting ? "Saving…" : "Save changes") : (submitting ? "Adding…" : "Add student")}
         </button>
       </div>
+
+      <style>{`@keyframes hms-spin { to { transform: rotate(360deg); } }`}</style>
     </form>
+  );
+}
+
+/** Tiny presentational helper — label + control + optional error text. */
+function Field({ label, error, children }) {
+  const { t } = useContext(ThemeContext);
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <label style={{
+        display: "block",
+        fontSize: 12,
+        fontWeight: 600,
+        color: t.muted,
+        marginBottom: 6,
+      }}>
+        {label}
+      </label>
+      {children}
+      {error && (
+        <div style={{ marginTop: 4, fontSize: 12, color: t.danger }}>
+          {error}
+        </div>
+      )}
+    </div>
   );
 }

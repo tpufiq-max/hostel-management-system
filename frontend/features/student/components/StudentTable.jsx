@@ -1,282 +1,196 @@
-import React, { useState, useMemo } from 'react';
+// StudentTable
+// ──────────────────────────────────────────────────────────────────────────────
+// Pure presentational component:
+//   * Receives `students` from the parent (which fetched them from the backend)
+//   * Sorting bubbles up to the parent (which re-queries the server)
+//   * Edit / delete actions are passed in as props
+//   * No internal mock data, no internal filtering
+//
+// Styled inline using the ThemeContext palette so it matches the rest of
+// the app today; will migrate to Tailwind utility classes when F4 design-
+// system PR is merged.
 
-const initialStudents = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 234 567 8900',
-    room: '101',
-    course: 'Computer Science',
-    year: '3rd Year',
-    status: 'Active',
-    joinDate: '2023-08-15',
-    emergencyContact: '+1 234 567 8901',
-    address: '123 Main St, City, State'
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    phone: '+1 234 567 8901',
-    room: '102',
-    course: 'Mechanical Engineering',
-    year: '2nd Year',
-    status: 'Active',
-    joinDate: '2023-08-20',
-    emergencyContact: '+1 234 567 8902',
-    address: '456 Oak Ave, City, State'
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    email: 'mike.johnson@example.com',
-    phone: '+1 234 567 8902',
-    room: '103',
-    course: 'Electrical Engineering',
-    year: '4th Year',
-    status: 'Inactive',
-    joinDate: '2022-08-10',
-    emergencyContact: '+1 234 567 8903',
-    address: '789 Pine Rd, City, State'
-  },
-  {
-    id: 4,
-    name: 'Sarah Wilson',
-    email: 'sarah.wilson@example.com',
-    phone: '+1 234 567 8903',
-    room: '104',
-    course: 'Civil Engineering',
-    year: '1st Year',
-    status: 'Active',
-    joinDate: '2024-08-25',
-    emergencyContact: '+1 234 567 8904',
-    address: '321 Elm St, City, State'
-  },
-  {
-    id: 5,
-    name: 'David Brown',
-    email: 'david.brown@example.com',
-    phone: '+1 234 567 8904',
-    room: '105',
-    course: 'Business Administration',
-    year: '2nd Year',
-    status: 'Active',
-    joinDate: '2023-08-18',
-    emergencyContact: '+1 234 567 8905',
-    address: '654 Maple Dr, City, State'
-  }
+import React, { useContext } from "react";
+import { ThemeContext } from "../../../context/ThemeContext";
+
+const COLUMNS = [
+  { key: "name",          label: "Student",     sortable: true,  width: "auto" },
+  { key: "email",         label: "Contact",     sortable: true,  width: "auto" },
+  { key: "rollNumber",    label: "Roll #",      sortable: true,  width: 120   },
+  { key: "roomNumber",    label: "Room",        sortable: true,  width: 100   },
+  { key: "course",        label: "Course",      sortable: true,  width: "auto" },
+  { key: "admissionDate", label: "Admitted",    sortable: true,  width: 130   },
+  { key: "feesStatus",    label: "Fees",        sortable: false, width: 110   },
+  { key: "isActive",      label: "Status",      sortable: false, width: 100   },
+  { key: "actions",       label: "",            sortable: false, width: 80    },
 ];
 
-export default function StudentTable({ onEdit, students = initialStudents, onDelete, onStatusChange }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [courseFilter, setCourseFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortOrder, setSortOrder] = useState('asc');
+export default function StudentTable({
+  students = [],
+  sort,                  // { field, direction }
+  onSortChange,          // (field) => void
+  onEdit,                // (student) => void
+  onDelete,              // (student) => void
+}) {
+  const { t, isDark } = useContext(ThemeContext);
 
-  const filteredAndSortedStudents = useMemo(() => {
-    let filtered = students.filter(student => {
-      const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           student.room.includes(searchTerm);
-      const matchesStatus = statusFilter === 'All' || student.status === statusFilter;
-      const matchesCourse = courseFilter === 'All' || student.course === courseFilter;
-
-      return matchesSearch && matchesStatus && matchesCourse;
-    });
-
-    filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'joinDate') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      }
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    return filtered;
-  }, [students, searchTerm, statusFilter, courseFilter, sortBy, sortOrder]);
-
-  const handleSort = (field) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
-
-  const getSortIcon = (field) => {
-    if (sortBy !== field) return '↕️';
-    return sortOrder === 'asc' ? '↑' : '↓';
+  const handleHeaderClick = (col) => {
+    if (!col.sortable || !onSortChange) return;
+    onSortChange(col.key);
   };
 
   return (
-    <div>
-      {/* Filters and Search */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-4 flex-1">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search students..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-
-            {/* Course Filter */}
-            <select
-              value={courseFilter}
-              onChange={(e) => setCourseFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="All">All Courses</option>
-              <option value="Computer Science">Computer Science</option>
-              <option value="Mechanical Engineering">Mechanical Engineering</option>
-              <option value="Electrical Engineering">Electrical Engineering</option>
-              <option value="Civil Engineering">Civil Engineering</option>
-              <option value="Business Administration">Business Administration</option>
-            </select>
-          </div>
-
-          <div className="text-sm text-gray-500">
-            {filteredAndSortedStudents.length} of {students.length} students
-          </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
+    <div style={{
+      background: t.surface,
+      border:     `1px solid ${t.border}`,
+      borderRadius: 12,
+      overflow:   "hidden",
+    }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{
+          width:           "100%",
+          borderCollapse:  "collapse",
+          fontFamily:      "Inter, system-ui, sans-serif",
+        }}>
+          <thead style={{
+            background:    isDark ? `${t.card}` : "#f8fafc",
+            borderBottom:  `1px solid ${t.border}`,
+          }}>
             <tr>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
-              >
-                Student {getSortIcon('name')}
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('email')}
-              >
-                Contact {getSortIcon('email')}
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('room')}
-              >
-                Room {getSortIcon('room')}
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('course')}
-              >
-                Course {getSortIcon('course')}
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('joinDate')}
-              >
-                Join Date {getSortIcon('joinDate')}
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              {COLUMNS.map(col => {
+                const isSorted = sort?.field === col.key;
+                const dir      = isSorted ? sort.direction : null;
+                return (
+                  <th
+                    key={col.key}
+                    onClick={() => handleHeaderClick(col)}
+                    style={{
+                      textAlign:    "left",
+                      padding:      "10px 14px",
+                      fontSize:     11,
+                      fontWeight:   700,
+                      color:        t.muted,
+                      textTransform:"uppercase",
+                      letterSpacing: 0.5,
+                      cursor:       col.sortable ? "pointer" : "default",
+                      userSelect:   "none",
+                      whiteSpace:   "nowrap",
+                      width:        col.width,
+                    }}
+                  >
+                    {col.label}
+                    {col.sortable && (
+                      <span style={{
+                        marginLeft: 4,
+                        opacity: isSorted ? 1 : 0.3,
+                        fontSize: 10,
+                      }}>
+                        {dir === "desc" ? "▼" : "▲"}
+                      </span>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
-          <tbody className="bg-[var(--bg-secondary)] divide-y divide-gray-200">
-            {filteredAndSortedStudents.map((student) => (
-              <tr key={student.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {student.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                      <div className="text-sm text-gray-500">{student.year}</div>
+          <tbody>
+            {students.map((s) => (
+              <tr
+                key={s.id}
+                style={{
+                  borderBottom: `1px solid ${t.border}`,
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? `${t.card}55` : "#f8fafc")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                {/* Student (avatar + name + year) */}
+                <td style={{ padding: "12px 14px", verticalAlign: "middle" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Avatar name={s.name} t={t} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: t.muted }}>
+                        {s.year ? `Year ${s.year}` : "—"}
+                        {s.department ? ` · ${s.department}` : ""}
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{student.email}</div>
-                  <div className="text-sm text-gray-500">{student.phone}</div>
+
+                {/* Contact */}
+                <td style={{ padding: "12px 14px", verticalAlign: "middle" }}>
+                  <div style={{ fontSize: 12, color: t.text }}>{s.email}</div>
+                  <div style={{ fontSize: 11, color: t.muted }}>{s.phone || "—"}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                    Room {student.room}
+
+                {/* Roll number */}
+                <td style={{ padding: "12px 14px", fontSize: 12, color: t.text, fontFamily: "monospace" }}>
+                  {s.rollNumber || "—"}
+                </td>
+
+                {/* Room */}
+                <td style={{ padding: "12px 14px", verticalAlign: "middle" }}>
+                  {s.roomNumber ? (
+                    <span style={{
+                      display:      "inline-block",
+                      padding:      "2px 8px",
+                      borderRadius: 6,
+                      background:   `${t.accent}1a`,
+                      color:        t.accent,
+                      fontSize:     12,
+                      fontWeight:   600,
+                    }}>
+                      {s.roomNumber}{s.bedNumber ? `/${s.bedNumber}` : ""}
+                    </span>
+                  ) : <span style={{ fontSize: 12, color: t.muted }}>—</span>}
+                </td>
+
+                {/* Course */}
+                <td style={{ padding: "12px 14px", fontSize: 12, color: t.text }}>
+                  {s.course || "—"}
+                </td>
+
+                {/* Admission */}
+                <td style={{ padding: "12px 14px", fontSize: 12, color: t.muted, whiteSpace: "nowrap" }}>
+                  {formatDate(s.admissionDate)}
+                </td>
+
+                {/* Fees */}
+                <td style={{ padding: "12px 14px" }}>
+                  <FeesBadge status={s.feesStatus} t={t} />
+                </td>
+
+                {/* Active toggle */}
+                <td style={{ padding: "12px 14px" }}>
+                  <span style={{
+                    display:      "inline-flex",
+                    alignItems:   "center",
+                    gap:          6,
+                    padding:      "2px 8px",
+                    borderRadius: 6,
+                    background:   s.isActive ? `${t.success}1a` : `${t.muted}1a`,
+                    color:        s.isActive ? t.success : t.muted,
+                    fontSize:     11,
+                    fontWeight:   600,
+                  }}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: s.isActive ? t.success : t.muted,
+                    }} />
+                    {s.isActive ? "Active" : "Inactive"}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {student.course}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(student.joinDate).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    value={student.status}
-                    onChange={(e) => onStatusChange?.(student.id, e.target.value)}
-                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border-0 ${
-                      student.status === 'Active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onEdit(student)}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                      title="Edit student"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => onDelete?.(student.id)}
-                      className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
-                      title="Delete student"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+
+                {/* Actions */}
+                <td style={{ padding: "12px 14px" }}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {onEdit && (
+                      <IconButton title="Edit" onClick={() => onEdit(s)} t={t} color={t.accent}>✎</IconButton>
+                    )}
+                    {onDelete && (
+                      <IconButton title="Delete" onClick={() => onDelete(s)} t={t} color={t.danger}>🗑</IconButton>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -285,20 +199,106 @@ export default function StudentTable({ onEdit, students = initialStudents, onDel
         </table>
       </div>
 
-      {/* Empty State */}
-      {filteredAndSortedStudents.length === 0 && (
-        <div className="px-6 py-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No students found</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {searchTerm || statusFilter !== 'All' || courseFilter !== 'All'
-              ? 'Try adjusting your search or filters.'
-              : 'Get started by adding a new student.'}
-          </p>
+      {/* Empty body — parent decides whether to render an empty state on top */}
+      {students.length === 0 && (
+        <div style={{
+          padding:    "32px 24px",
+          textAlign:  "center",
+          color:      t.muted,
+          fontSize:   13,
+        }}>
+          No students to show on this page.
         </div>
       )}
     </div>
   );
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function Avatar({ name, t }) {
+  const initials = (name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join("")
+    .toUpperCase() || "?";
+
+  return (
+    <div style={{
+      width:        32,
+      height:       32,
+      borderRadius: 8,
+      background:   `linear-gradient(135deg, ${t.accent}, ${t.purple})`,
+      color:        "#fff",
+      fontSize:     12,
+      fontWeight:   700,
+      display:      "flex",
+      alignItems:   "center",
+      justifyContent: "center",
+      flexShrink:   0,
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+function FeesBadge({ status, t }) {
+  if (!status) return <span style={{ fontSize: 12, color: t.muted }}>—</span>;
+  const map = {
+    PAID:    { color: t.success, bg: `${t.success}1a`, label: "Paid"    },
+    PENDING: { color: t.warning, bg: `${t.warning}1a`, label: "Pending" },
+    OVERDUE: { color: t.danger,  bg: `${t.danger}1a`,  label: "Overdue" },
+  };
+  const cfg = map[status] || { color: t.muted, bg: `${t.muted}1a`, label: status };
+  return (
+    <span style={{
+      display:      "inline-block",
+      padding:      "2px 8px",
+      borderRadius: 6,
+      background:   cfg.bg,
+      color:        cfg.color,
+      fontSize:     11,
+      fontWeight:   600,
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function IconButton({ children, title, onClick, t, color }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      style={{
+        width:        28,
+        height:       28,
+        borderRadius: 6,
+        border:       `1px solid ${t.border}`,
+        background:   "transparent",
+        color:        color,
+        fontSize:     13,
+        cursor:       "pointer",
+        display:      "inline-flex",
+        alignItems:   "center",
+        justifyContent: "center",
+        transition:   "background 0.15s, transform 0.1s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = `${color}1a`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }

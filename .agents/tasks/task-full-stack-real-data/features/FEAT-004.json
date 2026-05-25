@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Create a DataSeeder (Spring Boot CommandLineRunner) that seeds realistic demo data into all new tables on first startup, giving the application meaningful data to display immediately.",
+  "status": "completed",
+  "steps": [
+    "Create backend/src/main/java/com/hostel/config/DataSeeder.java as a @Configuration class with a @Bean CommandLineRunner. It should only seed if the mess_menus table (or equivalent) is empty (to avoid re-seeding on restart).",
+    "Seed 50+ MessMenu entries: full week (MON-SUN) x all meal types (BREAKFAST/LUNCH/DINNER/SNACKS) with realistic Indian hostel food items. Mark all as active with effectiveFrom = today.",
+    "Seed 30+ MaintenanceRequest entries with various statuses (OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, REJECTED), priorities, categories, room numbers, realistic titles/descriptions. Some should have assignedTo filled, completed ones should have completedDate.",
+    "Seed 40+ Visitor records: mix of CHECKED_IN (recent, no checkOutTime) and CHECKED_OUT (with checkOutTime). Various relations. If students exist in DB, link to real student IDs; otherwise use null studentId and store student info in notes.",
+    "Seed 20+ Notice entries: mix of categories (GENERAL, ACADEMIC, HOSTEL, EMERGENCY, EVENT), priorities, target audiences. Some active, some expired (expiresAt in past). Realistic hostel notice content.",
+    "Seed 15+ Event entries: mix of UPCOMING (future dates), COMPLETED (past dates), and 1-2 CANCELLED. Various categories, venues, times. Realistic hostel event data.",
+    "Add a property app.seed.demo-data.enabled (default true for dev profile, false for prod) to control whether seeding runs. Add the property to application-dev.properties as true and application-prod.properties as false.",
+    "Ensure the seeder logs what it creates (e.g., 'Seeded 56 mess menu items, 32 maintenance requests, ...') for visibility."
+  ],
+  "acceptance_criteria": [
+    "DataSeeder runs after DataInitializer (use @Order or @DependsOn)",
+    "Seeder is idempotent - checks if data already exists before inserting",
+    "At least 50 mess menu, 30 maintenance, 40 visitor, 20 notice, 15 event records seeded",
+    "Seeder only runs when app.seed.demo-data.enabled=true",
+    "Backend compiles successfully with mvn compile -DskipTests",
+    "Seeder data is realistic (not lorem ipsum) and varied across all enum values"
+  ],
+  "verification": [
+    "cd /projects/sandbox/hostel-management-system/backend && mvn compile -DskipTests -q"
+  ],
+  "blocked_reason": null,
+  "findings": "DataSeeder successfully created with 51 mess menus (28 week1 + 21 week2 + 2 special), 30 maintenance requests, 40 visitors, 22 notices, 15 events. Compilation verified successfully. Uses @Order(2) to run after DataInitializer."
+}

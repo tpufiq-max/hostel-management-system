@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Create Analytics endpoints and upgrade Dashboard to include data from new tables (visitors, maintenance). Add real database aggregation queries for revenue trends, occupancy, complaint analytics, and attendance trends.",
+  "status": "in_progress",
+  "steps": [
+    "Create AnalyticsController at backend/src/main/java/com/hostel/controller/AnalyticsController.java with endpoints: GET /api/analytics/summary, GET /api/analytics/revenue, GET /api/analytics/occupancy, GET /api/analytics/complaints, GET /api/analytics/attendance. All return ResponseEntity<ApiResponse<T>>.",
+    "Create AnalyticsService at backend/src/main/java/com/hostel/service/AnalyticsService.java that queries all repositories for aggregated data. Summary: total counts from all tables. Revenue: monthly fee collection using @Query with GROUP BY month. Occupancy: room status counts. Complaints: counts by status and category. Attendance: percentage by date range.",
+    "Create DTO classes for analytics responses in backend/src/main/java/com/hostel/dto/: AnalyticsSummaryDTO.java (all high-level counts), RevenueAnalyticsDTO.java (monthly amounts list), OccupancyAnalyticsDTO.java (occupied/available/maintenance counts), ComplaintAnalyticsDTO.java (by status and category breakdowns), AttendanceAnalyticsDTO.java (daily/weekly percentages).",
+    "Add new @Query methods to existing repositories: FeeRepository - monthly revenue grouped by year-month; AttendanceRepository - count by status and date range; ComplaintRepository - count grouped by category. Add count methods to the new repositories: MaintenanceRequestRepository countByStatus, VisitorRepository countByStatus.",
+    "Update DashboardStatsDTO.java to add new fields: activeVisitors (long), todayAttendancePercentage (double), openMaintenanceRequests (long), upcomingEvents (long), activeNotices (long).",
+    "Update DashboardService.java to query the new repositories (VisitorRepository, MaintenanceRequestRepository, EventRepository, NoticeRepository, AttendanceRepository) and populate the new DashboardStatsDTO fields with real database counts."
+  ],
+  "acceptance_criteria": [
+    "AnalyticsController exposes 5 GET endpoints at /api/analytics/*",
+    "All analytics data comes from real JPA repository queries with @Query annotations where needed",
+    "DashboardStatsDTO includes activeVisitors, todayAttendancePercentage, openMaintenanceRequests, upcomingEvents, activeNotices",
+    "DashboardService injects and queries all new repositories",
+    "Backend compiles successfully with mvn compile -DskipTests"
+  ],
+  "verification": [
+    "cd /projects/sandbox/hostel-management-system/backend && mvn compile -DskipTests -q"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

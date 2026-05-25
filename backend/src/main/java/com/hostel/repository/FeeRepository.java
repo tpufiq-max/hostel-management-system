@@ -21,4 +21,11 @@ public interface FeeRepository extends JpaRepository<Fee, Long> {
     double getPendingAmount();
 
     long countByPaymentStatus(Fee.PaymentStatus status);
+
+    @Query("SELECT CONCAT(YEAR(f.paymentDate), '-', LPAD(CAST(MONTH(f.paymentDate) AS String), 2, '0')) as month, " +
+           "COALESCE(SUM(f.amount), 0) as total FROM Fee f " +
+           "WHERE f.paymentStatus = 'PAID' AND f.paymentDate IS NOT NULL " +
+           "GROUP BY YEAR(f.paymentDate), MONTH(f.paymentDate) " +
+           "ORDER BY YEAR(f.paymentDate), MONTH(f.paymentDate)")
+    List<Object[]> getMonthlyRevenue();
 }

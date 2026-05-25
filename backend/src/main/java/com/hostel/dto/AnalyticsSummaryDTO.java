@@ -9,20 +9,15 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class DashboardStatsDTO {
+public class AnalyticsSummaryDTO {
     private long totalStudents;
-    private long activeStudents;
     private long totalRooms;
     private long occupiedRooms;
     private double totalRevenue;
-    private double pendingPayments;
-    private long totalComplaints;
-    private long resolvedComplaints;
+    private double pendingFees;
     private long openComplaints;
-    private double occupancyRate;
     private long activeVisitors;
-    private double todayAttendancePercentage;
     private long openMaintenanceRequests;
-    private long upcomingEvents;
     private long activeNotices;
+    private long upcomingEvents;
 }

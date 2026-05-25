@@ -2,6 +2,8 @@ package com.hostel.repository;
 
 import com.hostel.entity.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -15,4 +17,11 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<Attendance> findByStudentIdAndDateBetween(Long studentId, LocalDate startDate, LocalDate endDate);
     Optional<Attendance> findByStudentIdAndDate(Long studentId, LocalDate date);
     long countByDateAndStatus(LocalDate date, Attendance.AttendanceStatus status);
+    long countByDate(LocalDate date);
+
+    @Query("SELECT a.date, a.status, COUNT(a) FROM Attendance a " +
+           "WHERE a.date BETWEEN :startDate AND :endDate " +
+           "GROUP BY a.date, a.status ORDER BY a.date")
+    List<Object[]> countByDateRangeGrouped(@Param("startDate") LocalDate startDate,
+                                           @Param("endDate") LocalDate endDate);
 }

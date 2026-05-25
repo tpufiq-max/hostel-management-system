@@ -138,6 +138,43 @@ exists.
 - `npm run dev` — start the development server
 - `npm run build` — build for production
 - `npm run preview` — preview the production build
+## API Documentation (Swagger / OpenAPI)
+
+While the backend is running:
+
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+
+The UI lets you explore every endpoint, see request/response schemas, and try
+the APIs directly from the browser. Click **Authorize** at the top, paste your
+JWT access token (from `POST /api/auth/login`), and protected endpoints become
+callable.
+
+## Features Overview
+
+### Authentication
+- Secure login system with role-based access
+- JWT token-based authentication
+- Protected routes
+
+### Responsive Design
+- Mobile-first approach
+- Responsive grid layouts
+- Adaptive navigation
+
+### Modern UI/UX
+- Clean, modern interface
+- Consistent design system
+- Smooth animations and transitions
+- Dark/light theme support (expandable)
+
+## Contributing
+
+1. Follow the existing code style
+2. Use Tailwind CSS for styling
+3. Ensure responsive design
+4. Test on multiple screen sizes
+5. Follow React best practices
 
 ## License
 

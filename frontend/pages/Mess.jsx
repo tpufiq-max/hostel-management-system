@@ -1,175 +1,542 @@
-import React, { useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import Modal from "../components/common/Modal";
+import LoadingSkeleton from "../components/common/LoadingSkeleton";
+import { ThemeContext } from "../context/ThemeContext";
+import { useNotification } from "../context/NotificationContext";
+import { messService } from "../features/mess/messService";
 
-const initialMeals = [
-  { id: 1, day: 'Monday', menu: 'Pasta, Salad, Juice', type: 'Lunch' },
-  { id: 2, day: 'Tuesday', menu: 'Rice, Curry, Yogurt', type: 'Lunch' },
-  { id: 3, day: 'Wednesday', menu: 'Chapati, Dal, Vegetables', type: 'Lunch' },
-  { id: 4, day: 'Thursday', menu: 'Biryani, Raita, Salad', type: 'Lunch' },
-  { id: 5, day: 'Friday', menu: 'Noodles, Manchurian, Soup', type: 'Lunch' },
+/* ── Backend enums ─────────────────────────────────────────────── */
+
+const DAYS = [
+  { value: "MON", label: "Monday"    },
+  { value: "TUE", label: "Tuesday"   },
+  { value: "WED", label: "Wednesday" },
+  { value: "THU", label: "Thursday"  },
+  { value: "FRI", label: "Friday"    },
+  { value: "SAT", label: "Saturday"  },
+  { value: "SUN", label: "Sunday"    },
 ];
 
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+const MEAL_TYPES = [
+  { value: "BREAKFAST", label: "Breakfast", color: "var(--warning)" },
+  { value: "LUNCH",     label: "Lunch",     color: "var(--accent)"  },
+  { value: "SNACKS",    label: "Snacks",    color: "var(--purple)"  },
+  { value: "DINNER",    label: "Dinner",    color: "var(--success)" },
+];
+
+const DAY_LABEL  = Object.fromEntries(DAYS.map((d) => [d.value, d.label]));
+const MEAL_BY_VALUE = Object.fromEntries(MEAL_TYPES.map((m) => [m.value, m]));
+
+const emptyForm = {
+  day: "MON",
+  mealType: "BREAKFAST",
+  items: "",
+  specialNote: "",
+  isActive: true,
+};
+
+/* ── Page ──────────────────────────────────────────────────────── */
 
 export default function Mess() {
-  const [meals, setMeals] = useState(initialMeals);
+  const { t } = useContext(ThemeContext);
+  const toast = useNotification();
+
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [dayFilter, setDayFilter] = useState("");
+  const [mealFilter, setMealFilter] = useState("");
+
   const [showForm, setShowForm] = useState(false);
-  const [editingMeal, setEditingMeal] = useState(null);
-  const [formData, setFormData] = useState({
-    day: 'Monday', menu: '', type: 'Lunch'
-  });
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState(null);
 
-  const handleAddMeal = () => {
-    setEditingMeal(null);
-    setFormData({ day: 'Monday', menu: '', type: 'Lunch' });
-    setShowForm(true);
-  };
-
-  const handleEditMeal = (meal) => {
-    setEditingMeal(meal);
-    setFormData(meal);
-    setShowForm(true);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingMeal) {
-      setMeals(meals.map(m => m.id === editingMeal.id ? { ...formData, id: editingMeal.id } : m));
-    } else {
-      setMeals([...meals, { ...formData, id: Date.now() }]);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // The full week is at most 28 entries (7 days x 4 meals); fetch everything once.
+      const result = await messService.list({ page: 0, size: 100 });
+      setItems(result?.content || []);
+    } catch (err) {
+      setError(err?.message || "Failed to load mess menu.");
+    } finally {
+      setLoading(false);
     }
-    setShowForm(false);
-  };
+  }, []);
 
-  const handleDeleteMeal = (id) => {
-    setMeals(meals.filter(m => m.id !== id));
-  };
+  useEffect(() => { reload(); }, [reload]);
+
+  /* ── Filtered + grouped view ────────────────────────────────── */
+
+  const filtered = useMemo(() => {
+    return items.filter((m) => {
+      if (dayFilter && m.day !== dayFilter) return false;
+      if (mealFilter && m.mealType !== mealFilter) return false;
+      return true;
+    });
+  }, [items, dayFilter, mealFilter]);
+
+  /** menusByDay[day][mealType] = MessMenuDTO */
+  const menusByDay = useMemo(() => {
+    const map = {};
+    for (const m of filtered) {
+      if (!map[m.day]) map[m.day] = {};
+      map[m.day][m.mealType] = m;
+    }
+    return map;
+  }, [filtered]);
+
+  /* ── Form handlers ──────────────────────────────────────────── */
+
+  function openCreate(prefill) {
+    setEditing(null);
+    setForm({ ...emptyForm, ...(prefill || {}) });
+    setShowForm(true);
+  }
+
+  function openEdit(menu) {
+    setEditing(menu);
+    setForm({
+      day:         menu.day         || "MON",
+      mealType:    menu.mealType    || "BREAKFAST",
+      items:       menu.items       || "",
+      specialNote: menu.specialNote || "",
+      isActive:    menu.isActive ?? true,
+    });
+    setShowForm(true);
+  }
+
+  function patch(p) { setForm((f) => ({ ...f, ...p })); }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    if (!form.items.trim()) {
+      toast.error("Items list is required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await messService.update(editing.id, form);
+        toast.success("Menu updated.");
+      } else {
+        await messService.create(form);
+        toast.success("Menu added.");
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm(emptyForm);
+      await reload();
+    } catch (err) {
+      toast.error(err?.message || "Failed to save menu.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(menu) {
+    if (busyId) return;
+    if (!window.confirm(`Remove the ${menu.mealType.toLowerCase()} menu for ${DAY_LABEL[menu.day]}?`)) return;
+    setBusyId(menu.id);
+    try {
+      await messService.remove(menu.id);
+      toast.success("Menu removed.");
+      await reload();
+    } catch (err) {
+      toast.error(err?.message || "Failed to remove menu.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const totalSlots = DAYS.length * MEAL_TYPES.length;
+  const filledSlots = items.length;
+
+  /* ── Render ──────────────────────────────────────────────────── */
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, color: t.text }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mess Management</h1>
-          <p className="mt-2 text-gray-600">Plan and manage the weekly meal schedule for students.</p>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: t.text }}>
+            Mess management
+          </h1>
+          <p style={{ margin: "4px 0 0", color: t.muted, fontSize: 13 }}>
+            Plan and manage the weekly meal schedule.
+            {!loading && ` ${filledSlots} of ${totalSlots} slots filled.`}
+          </p>
         </div>
-        <button
-          onClick={handleAddMeal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Meal
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <select
+            value={dayFilter}
+            onChange={(e) => setDayFilter(e.target.value)}
+            style={selectStyle(t)}
+            aria-label="Filter by day"
+          >
+            <option value="">All days</option>
+            {DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
+          <select
+            value={mealFilter}
+            onChange={(e) => setMealFilter(e.target.value)}
+            style={selectStyle(t)}
+            aria-label="Filter by meal type"
+          >
+            <option value="">All meals</option>
+            {MEAL_TYPES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <button type="button" onClick={() => openCreate()} style={primaryButton(t)}>
+            + Add menu
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {meals.map((meal) => (
-          <div key={meal.id} className="bg-[var(--bg-secondary)] rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{meal.day}</h2>
-                <span className="text-sm font-medium text-blue-600">{meal.type}</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEditMeal(meal)}
-                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => handleDeleteMeal(meal.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <p className="text-gray-600 text-sm leading-relaxed">{meal.menu}</p>
-          </div>
-        ))}
-      </div>
+      {error && !loading && (
+        <div role="alert" style={errorBannerStyle}>
+          {error}
+          <button type="button" onClick={reload} style={linkButtonStyle}>Retry</button>
+        </div>
+      )}
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-secondary)] rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {editingMeal ? 'Edit Meal' : 'Add Meal'}
+      {/* Body */}
+      {loading ? (
+        <LoadingSkeleton count={5} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          t={t}
+          hasFilter={!!(dayFilter || mealFilter)}
+          onClear={() => { setDayFilter(""); setMealFilter(""); }}
+          onAdd={() => openCreate()}
+        />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {DAYS.map((day) => {
+            const dayMenus = menusByDay[day.value];
+            if (!dayMenus) return null;
+            return (
+              <div key={day.value} style={panelStyle(t)}>
+                <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: t.text }}>
+                  {day.label}
                 </h2>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                  {MEAL_TYPES.map((meal) => {
+                    const menu = dayMenus[meal.value];
+                    if (!menu && (mealFilter && mealFilter !== meal.value)) return null;
+                    if (!menu) {
+                      // Empty slot — show as placeholder if no meal filter is set
+                      if (mealFilter) return null;
+                      return (
+                        <button
+                          key={meal.value}
+                          type="button"
+                          onClick={() => openCreate({ day: day.value, mealType: meal.value })}
+                          style={emptySlotStyle(t)}
+                        >
+                          <div style={{ fontSize: 11, color: meal.color, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            {meal.label}
+                          </div>
+                          <div style={{ fontSize: 12, color: t.muted }}>+ Add menu</div>
+                        </button>
+                      );
+                    }
+                    return (
+                      <MenuCard
+                        key={meal.value}
+                        menu={menu}
+                        meal={meal}
+                        t={t}
+                        busy={busyId === menu.id}
+                        onEdit={() => openEdit(menu)}
+                        onDelete={() => handleDelete(menu)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Day</label>
-                  <select
-                    value={formData.day}
-                    onChange={(e) => setFormData({...formData, day: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    {days.map(day => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    {mealTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Menu Items</label>
-                  <textarea
-                    value={formData.menu}
-                    onChange={(e) => setFormData({...formData, menu: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={3}
-                    placeholder="Enter menu items separated by commas"
-                    required
-                  />
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                  >
-                    {editingMeal ? 'Update' : 'Add'} Meal
-                  </button>
-                </div>
-              </form>
-            </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => !submitting && setShowForm(false)}
+        title={editing ? "Edit menu" : "Add menu"}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="Day" required>
+              <select
+                value={form.day}
+                onChange={(e) => patch({ day: e.target.value })}
+                disabled={submitting || !!editing}
+                style={inputStyle(t)}
+              >
+                {DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Meal type" required>
+              <select
+                value={form.mealType}
+                onChange={(e) => patch({ mealType: e.target.value })}
+                disabled={submitting || !!editing}
+                style={inputStyle(t)}
+              >
+                {MEAL_TYPES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </Field>
           </div>
+
+          {!editing && (
+            <p style={{ margin: 0, fontSize: 11, color: t.muted, lineHeight: 1.5 }}>
+              The backend enforces one menu per (day, meal type) slot. If a menu already exists
+              for this slot, you will see an error — edit the existing one instead.
+            </p>
+          )}
+
+          <Field label="Menu items" required>
+            <textarea
+              required
+              rows={3}
+              value={form.items}
+              onChange={(e) => patch({ items: e.target.value })}
+              placeholder="Idli, Sambar, Coconut Chutney, Tea/Coffee"
+              disabled={submitting}
+              style={{ ...inputStyle(t), resize: "vertical", fontFamily: "inherit" }}
+            />
+          </Field>
+
+          <Field label="Special note (optional)">
+            <input
+              type="text"
+              value={form.specialNote}
+              onChange={(e) => patch({ specialNote: e.target.value })}
+              placeholder="e.g. Special weekend menu"
+              disabled={submitting}
+              style={inputStyle(t)}
+            />
+          </Field>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: t.text, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => patch({ isActive: e.target.checked })}
+              disabled={submitting}
+              style={{ width: 16, height: 16 }}
+            />
+            Active
+          </label>
+
+          <div style={{ display: "flex", gap: 10, paddingTop: 6 }}>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              disabled={submitting}
+              style={{ ...secondaryButton(t), flex: 1 }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{ ...primaryButton(t), flex: 1, opacity: submitting ? 0.7 : 1, cursor: submitting ? "wait" : "pointer" }}
+            >
+              {submitting
+                ? (editing ? "Updating…" : "Adding…")
+                : (editing ? "Update menu" : "Add menu")}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+/* ── Sub-components ────────────────────────────────────────────── */
+
+function MenuCard({ menu, meal, t, busy, onEdit, onDelete }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        background: t.bg,
+        border: `1px solid ${t.border}`,
+        borderTop: `3px solid ${meal.color}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        opacity: menu.isActive ? 1 : 0.6,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ fontSize: 11, color: meal.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {meal.label}{!menu.isActive && <span style={{ color: t.muted, fontWeight: 500, marginLeft: 6 }}>(inactive)</span>}
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button type="button" onClick={onEdit} disabled={busy} style={tinyButton(t, t.accent)} aria-label="Edit menu">
+            Edit
+          </button>
+          <button type="button" onClick={onDelete} disabled={busy} style={tinyButton(t, "var(--danger)")} aria-label="Delete menu">
+            Remove
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: 13, color: t.text, lineHeight: 1.55 }}>{menu.items}</div>
+      {menu.specialNote && (
+        <div style={{ fontSize: 11, color: t.muted, fontStyle: "italic" }}>
+          {menu.specialNote}
         </div>
       )}
     </div>
   );
 }
+
+function EmptyState({ t, hasFilter, onClear, onAdd }) {
+  return (
+    <div style={{ padding: "40px 20px", textAlign: "center", color: t.muted, background: t.surface, border: `1px dashed ${t.border}`, borderRadius: 14 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 6 }}>
+        {hasFilter ? "No menus match this filter" : "No menus yet"}
+      </div>
+      <div style={{ fontSize: 13 }}>
+        {hasFilter ? "Try a different day or meal type." : "Add the first menu with the Add menu button."}
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
+        {hasFilter && (
+          <button type="button" onClick={onClear} style={secondaryButton(t)}>Clear filter</button>
+        )}
+        <button type="button" onClick={onAdd} style={primaryButton(t)}>+ Add menu</button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, required, children }) {
+  return (
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
+      {label}{required && <span style={{ color: "var(--danger)" }}> *</span>}
+      <div style={{ marginTop: 6 }}>{children}</div>
+    </label>
+  );
+}
+
+/* ── Style helpers ─────────────────────────────────────────────── */
+
+function panelStyle(t) {
+  return {
+    background: t.surface,
+    border: `1px solid ${t.border}`,
+    borderRadius: 16,
+    padding: 18,
+  };
+}
+
+function emptySlotStyle(t) {
+  return {
+    padding: 14,
+    borderRadius: 12,
+    background: "transparent",
+    border: `2px dashed ${t.border}`,
+    color: t.muted,
+    fontSize: 12,
+    textAlign: "center",
+    cursor: "pointer",
+    transition: "border-color 0.15s, background 0.15s",
+    minHeight: 90,
+  };
+}
+
+function inputStyle(t) {
+  return {
+    width: "100%",
+    padding: "9px 12px",
+    borderRadius: 10,
+    border: `1px solid ${t.border}`,
+    background: t.card,
+    color: t.text,
+    fontSize: 13,
+    outline: "none",
+  };
+}
+
+function selectStyle(t) {
+  return {
+    ...inputStyle(t),
+    width: "auto",
+    minWidth: 140,
+    paddingRight: 28,
+    cursor: "pointer",
+  };
+}
+
+function primaryButton(t) {
+  return {
+    padding: "9px 16px",
+    borderRadius: 10,
+    border: "none",
+    background: `linear-gradient(135deg, ${t.accent}, ${t.purple})`,
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: `0 4px 14px ${t.accent}44`,
+  };
+}
+
+function secondaryButton(t) {
+  return {
+    padding: "9px 16px",
+    borderRadius: 10,
+    border: `1px solid ${t.border}`,
+    background: t.card,
+    color: t.text,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+}
+
+function tinyButton(t, color) {
+  return {
+    padding: "5px 10px",
+    borderRadius: 8,
+    border: `1px solid ${color}55`,
+    background: `${color}11`,
+    color,
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}
+
+const errorBannerStyle = {
+  padding: "10px 14px",
+  borderRadius: 10,
+  background: "rgba(248,113,113,0.12)",
+  border: "1px solid rgba(248,113,113,0.45)",
+  color: "var(--danger)",
+  fontSize: 13,
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+};
+
+const linkButtonStyle = {
+  marginLeft: "auto",
+  background: "none",
+  border: "none",
+  color: "var(--danger)",
+  fontWeight: 700,
+  cursor: "pointer",
+  textDecoration: "underline",
+  fontSize: 12,
+};

@@ -1,197 +1,240 @@
-import React, { useState } from 'react';
-import Button from '../components/common/Button';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import LoadingSkeleton from "../components/common/LoadingSkeleton";
+import { ThemeContext } from "../context/ThemeContext";
+import { feesService } from "../features/fees/feesService";
+import { dashboardService } from "../features/dashboard/dashboardService";
+
+const FEE_TYPE_COLORS = [
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--purple)",
+  "var(--danger)",
+];
 
 export default function FinancialDashboard() {
-  const [timeRange, setTimeRange] = useState('month');
+  const { t } = useContext(ThemeContext);
+  const [fees, setFees]           = useState([]);
+  const [stats, setStats]         = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [page, setPage]           = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
-  const financialData = {
-    totalRevenue: 95000,
-    totalExpenses: 28000,
-    netIncome: 67000,
-    outstandingFees: 12500,
-    recentTransactions: [
-      { id: 1, type: 'income', description: 'Monthly fees from Room 101', amount: 8000, date: '2024-05-18', status: 'completed' },
-      { id: 2, type: 'expense', description: 'Electricity bill', amount: 5000, date: '2024-05-17', status: 'completed' },
-      { id: 3, type: 'income', description: 'Monthly fees from Room 205', amount: 8000, date: '2024-05-16', status: 'completed' },
-      { id: 4, type: 'expense', description: 'Water supply charges', amount: 3000, date: '2024-05-16', status: 'completed' },
-      { id: 5, type: 'income', description: 'Monthly fees from Room 310', amount: 8000, date: '2024-05-15', status: 'pending' },
-    ],
-    expenseBreakdown: [
-      { category: 'Utilities', amount: 10000, percentage: 35 },
-      { category: 'Maintenance', amount: 8000, percentage: 28 },
-      { category: 'Staff Salary', amount: 7000, percentage: 25 },
-      { category: 'Supplies', amount: 3000, percentage: 12 }
-    ],
-    pendingPayments: [
-      { studentName: 'Neha Singh (Room 215)', amount: 5000, daysOverdue: 5 },
-      { studentName: 'Vikram Das (Room 115)', amount: 2500, daysOverdue: 2 },
-      { studentName: 'Others', amount: 5000, daysOverdue: 0 }
-    ]
-  };
+  const PAGE_SIZE = 10;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [feesRes, statsRes] = await Promise.allSettled([
+        feesService.list({ page, size: PAGE_SIZE }),
+        dashboardService.stats(),
+      ]);
+      if (feesRes.status  === "fulfilled") {
+        setFees(feesRes.value?.content || []);
+        setTotalPages(feesRes.value?.totalPages || 0);
+      }
+      if (statsRes.status === "fulfilled") setStats(statsRes.value);
+    } catch (err) {
+      setError(err?.message || "Failed to load financial data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const summary = useMemo(() => {
+    let paid = 0, pending = 0, overdue = 0;
+    const byType = {};
+    for (const f of fees) {
+      const amt = Number(f.amount) || 0;
+      if (f.paymentStatus === "PAID")    paid    += amt;
+      else if (f.paymentStatus === "OVERDUE") overdue += amt;
+      else                               pending += amt;
+      const type = f.feeType || "OTHER";
+      byType[type] = (byType[type] || 0) + amt;
+    }
+    const typeEntries = Object.entries(byType).sort((a, b) => b[1] - a[1]);
+    return { paid, pending, overdue, outstanding: pending + overdue, typeEntries, maxType: typeEntries[0]?.[1] || 1 };
+  }, [fees]);
+
+  const pendingFees = useMemo(
+    () => fees.filter(f => f.paymentStatus === "PENDING" || f.paymentStatus === "OVERDUE"),
+    [fees]
+  );
+
+  const fmt = (n) => `₹ ${Number(n || 0).toLocaleString()}`;
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, color: t.text }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 className="text-4xl font-bold" style={{color: 'var(--text)'}}>Financial Dashboard</h1>
-          <p className="mt-2" style={{color: 'var(--muted)'}}>Revenue, expenses, and financial overview</p>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: t.text }}>Financial Dashboard</h1>
+          <p style={{ margin: "4px 0 0", color: t.muted, fontSize: 13 }}>
+            Revenue, fees, and collection status — live from the database.
+          </p>
         </div>
-        <div className="flex gap-2">
-          {['week', 'month', 'year'].map(range => (
-            <Button
-              key={range}
-              variant={timeRange === range ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setTimeRange(range)}
-            >
-              {range.charAt(0).toUpperCase() + range.slice(1)}
-            </Button>
-          ))}
-        </div>
+        <button type="button" onClick={load} disabled={loading} style={navBtn(t, loading)}>
+          {loading ? "Loading…" : "↻ Refresh"}
+        </button>
       </div>
 
-      {/* Key Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Revenue */}
-        <div className="border-2 rounded-xl p-6" style={{backgroundColor: 'var(--surface)', backgroundImage: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,0.03) 100%)', borderColor: 'var(--success)', borderOpacity: 0.3}}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold" style={{color: 'var(--success)'}}>Total Revenue</p>
-              <p className="text-4xl font-bold" style={{color: 'var(--text)'}}>₹{financialData.totalRevenue.toLocaleString()}</p>
-              <p className="text-xs mt-2" style={{color: 'var(--muted)'}}>+8% from last period</p>
-            </div>
-            <div className="text-5xl opacity-30">💰</div>
-          </div>
+      {error && !loading && (
+        <div role="alert" style={errorBanner}>
+          {error}
+          <button type="button" onClick={load} style={linkBtnStyle}>Retry</button>
         </div>
+      )}
 
-        {/* Total Expenses */}
-        <div className="border-2 rounded-xl p-6" style={{backgroundColor: 'var(--surface)', backgroundImage: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.03) 100%)', borderColor: 'var(--danger)', borderOpacity: 0.3}}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold" style={{color: 'var(--danger)'}}>Total Expenses</p>
-              <p className="text-4xl font-bold" style={{color: 'var(--text)'}}>₹{financialData.totalExpenses.toLocaleString()}</p>
-              <p className="text-xs mt-2" style={{color: 'var(--muted)'}}>-3% from last period</p>
-            </div>
-            <div className="text-5xl opacity-30">💸</div>
+      {loading ? (
+        <LoadingSkeleton count={4} />
+      ) : (
+        <>
+          {/* Fee summary cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+            <MetricCard t={t} label="Paid revenue"      value={fmt(summary.paid)}        color="var(--success)" hint="from this page" />
+            <MetricCard t={t} label="Pending"           value={fmt(summary.pending)}     color="var(--warning)" hint="not yet paid" />
+            <MetricCard t={t} label="Overdue"           value={fmt(summary.overdue)}     color="var(--danger)"  hint="past due date" />
+            <MetricCard t={t} label="Total outstanding" value={fmt(summary.outstanding)} color={t.muted}        hint="pending + overdue" />
           </div>
-        </div>
 
-        {/* Net Income */}
-        <div className="border-2 rounded-xl p-6" style={{backgroundColor: 'var(--surface)', backgroundImage: 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(59,130,246,0.03) 100%)', borderColor: 'var(--accent)', borderOpacity: 0.3}}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold" style={{color: 'var(--accent)'}}>Net Income</p>
-              <p className="text-4xl font-bold" style={{color: 'var(--text)'}}>₹{financialData.netIncome.toLocaleString()}</p>
-              <p className="text-xs mt-2" style={{color: 'var(--muted)'}}>Profit margin: 70%</p>
+          {/* Hostel stats (from dashboard endpoint) */}
+          {stats && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+              <MetricCard t={t} label="Total students"  value={stats.totalStudents}  color={t.accent}         hint="registered"                  small />
+              <MetricCard t={t} label="Active students" value={stats.activeStudents} color="var(--success)"   hint=""                            small />
+              <MetricCard t={t} label="Rooms occupied"  value={`${stats.occupiedRooms}/${stats.totalRooms}`} color={t.accent} hint={`${Math.round(stats.occupancyRate ?? 0)}%`} small />
+              <MetricCard t={t} label="Open complaints" value={stats.openComplaints} color="var(--danger)"    hint=""                            small />
             </div>
-            <div className="text-5xl opacity-30">📈</div>
-          </div>
-        </div>
+          )}
 
-        {/* Outstanding Fees */}
-        <div className="border-2 rounded-xl p-6" style={{backgroundColor: 'var(--surface)', backgroundImage: 'linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(245,158,11,0.03) 100%)', borderColor: 'var(--warning)', borderOpacity: 0.3}}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold" style={{color: 'var(--warning)'}}>Outstanding Fees</p>
-              <p className="text-4xl font-bold" style={{color: 'var(--text)'}}>₹{financialData.outstandingFees.toLocaleString()}</p>
-              <p className="text-xs mt-2" style={{color: 'var(--muted)'}}>From 3 students</p>
-            </div>
-            <div className="text-5xl opacity-30">⚠️</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Transactions */}
-        <div className="lg:col-span-2 rounded-xl border-2 p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', borderOpacity: 0.2}}>
-          <h2 className="text-lg font-bold mb-4" style={{color: 'var(--text)'}}>Recent Transactions</h2>
-          <div className="space-y-3">
-            {financialData.recentTransactions.map(transaction => (
-              <div
-                key={transaction.id}
-                className={`flex items-center justify-between p-4 rounded-lg border-2`}
-                style={{
-                  backgroundColor: 'var(--background)',
-                  borderColor: transaction.type === 'income' ? 'var(--success)' : 'var(--danger)',
-                  borderOpacity: 0.2
-                }}
-              >
-                <div className="flex-1">
-                  <p className="font-bold" style={{color: 'var(--text)'}}>
-                    {transaction.description}
-                  </p>
-                  <p className="text-sm" style={{color: 'var(--muted)'}}>
-                    {transaction.date} • {transaction.status === 'pending' ? '⏳ Pending' : '✓ Completed'}
-                  </p>
+          {/* Main grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 16 }}>
+            {/* Recent fee records */}
+            <div style={panel(t)}>
+              <div style={panelHeader(t)}>
+                <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>Recent fee records</h2>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <button type="button" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={pgBtn(t, page === 0)}>←</button>
+                  <span style={{ fontSize: 12, color: t.muted }}>{page + 1}/{Math.max(1, totalPages)}</span>
+                  <button type="button" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={pgBtn(t, page >= totalPages - 1)}>→</button>
                 </div>
-                <p className="text-xl font-bold" style={{color: transaction.type === 'income' ? 'var(--success)' : 'var(--danger)'}}>
-                  {transaction.type === 'income' ? '+' : '-'}₹{transaction.amount.toLocaleString()}
-                </p>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Pending Payments */}
-        <div className="rounded-xl border-2 p-6" style={{backgroundColor: 'var(--surface)', borderColor: 'var(--accent)', borderOpacity: 0.2}}>
-          <h2 className="text-lg font-bold mb-4" style={{color: 'var(--text)'}}>Pending Collections</h2>
-          <div className="space-y-3">
-            {financialData.pendingPayments.map((payment, idx) => (
-              <div
-                key={idx}
-                className={`p-4 rounded-lg border-2`}
-                style={{
-                  backgroundColor: 'var(--background)',
-                  borderColor: payment.daysOverdue > 3 ? 'var(--danger)' : payment.daysOverdue > 0 ? 'var(--warning)' : 'var(--accent)',
-                  borderOpacity: 0.2
-                }}
-              >
-                <p className="font-bold text-sm text-gray-900">{payment.studentName}</p>
-                <p className="text-xl font-bold mt-2 text-gray-900">₹{payment.amount.toLocaleString()}</p>
-                {payment.daysOverdue > 0 && (
-                  <p className={`text-xs font-semibold mt-1 ${
-                    payment.daysOverdue > 3 ? 'text-red-700' : 'text-yellow-700'
-                  }`}>
-                    ⚠️ {payment.daysOverdue} days overdue
-                  </p>
+              {fees.length === 0 ? (
+                <div style={{ padding: "28px 16px", textAlign: "center", color: t.muted, fontSize: 13 }}>
+                  No fee records yet. Add some from the <a href="/fees" style={{ color: t.accent }}>Fees page</a>.
+                </div>
+              ) : (
+                fees.map(f => {
+                  const isPaid = f.paymentStatus === "PAID";
+                  const isOverdue = f.paymentStatus === "OVERDUE";
+                  const color = isPaid ? "var(--success)" : isOverdue ? "var(--danger)" : "var(--warning)";
+                  return (
+                    <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${t.border}`, gap: 12 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {f.studentName || `Student #${f.studentId}`}
+                        </div>
+                        <div style={{ fontSize: 11, color: t.muted }}>
+                          {f.feeType || "Fee"}{f.semester ? ` · ${f.semester}` : ""}
+                          {f.dueDate  ? ` · Due ${f.dueDate}` : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color }}>{fmt(f.amount)}</div>
+                        <div style={{ fontSize: 10, color, fontWeight: 700, textTransform: "uppercase" }}>{f.paymentStatus}</div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right column */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Fee-type breakdown */}
+              {summary.typeEntries.length > 0 && (
+                <div style={panel(t)}>
+                  <div style={panelHeader(t)}>
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>By fee type</h2>
+                  </div>
+                  <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {summary.typeEntries.map(([type, amount], i) => {
+                      const col = FEE_TYPE_COLORS[i % FEE_TYPE_COLORS.length];
+                      return (
+                        <div key={type}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: t.text, fontWeight: 600 }}>{type}</span>
+                            <span style={{ color: col, fontWeight: 700 }}>{fmt(amount)}</span>
+                          </div>
+                          <div style={{ height: 6, background: t.border, borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${(amount / summary.maxType) * 100}%`, height: "100%", background: col, borderRadius: 4 }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Pending collections */}
+              <div style={panel(t)}>
+                <div style={panelHeader(t)}>
+                  <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>Pending collections</h2>
+                  <span style={{ fontSize: 11, color: "var(--warning)", fontWeight: 700 }}>
+                    {pendingFees.length} record{pendingFees.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {pendingFees.length === 0 ? (
+                  <div style={{ padding: "20px 16px", textAlign: "center", color: t.muted, fontSize: 13 }}>
+                    All fees on this page are paid ✓
+                  </div>
+                ) : (
+                  pendingFees.slice(0, 6).map(f => {
+                    const color = f.paymentStatus === "OVERDUE" ? "var(--danger)" : "var(--warning)";
+                    return (
+                      <div key={f.id} style={{ padding: "10px 16px", borderBottom: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", gap: 10 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {f.studentName || `Student #${f.studentId}`}
+                          </div>
+                          {f.dueDate && <div style={{ fontSize: 10, color }}>Due {f.dueDate}</div>}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color, flexShrink: 0 }}>{fmt(f.amount)}</div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Expense Breakdown */}
-      <div className="bg-[var(--bg-secondary)] rounded-xl border-2 border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Expense Breakdown</h2>
-        <div className="space-y-4">
-          {financialData.expenseBreakdown.map((expense, idx) => (
-            <div key={idx} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">{expense.category}</span>
-                <span className="font-bold text-gray-900">₹{expense.amount.toLocaleString()}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-blue-400 h-full rounded-full transition-all"
-                  style={{ width: `${expense.percentage}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-gray-500">{expense.percentage}% of total expenses</p>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Button variant="primary" fullWidth>📋 Generate Report</Button>
-        <Button variant="secondary" fullWidth>💾 Export Data</Button>
-        <Button variant="secondary" fullWidth>📧 Send Reminders</Button>
-        <Button variant="secondary" fullWidth>⚙️ Settings</Button>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
+/* ── Subcomponents ─────────────────────────────────────────────── */
+
+function MetricCard({ t, label, value, color, hint, small }) {
+  return (
+    <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderTop: `3px solid ${color}`, borderRadius: 12, padding: small ? 14 : 18 }}>
+      <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: small ? 20 : 28, fontWeight: 800, color, marginTop: 4, letterSpacing: -0.5 }}>{value}</div>
+      {hint && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{hint}</div>}
+    </div>
+  );
+}
+
+/* ── Style helpers ─────────────────────────────────────────────── */
+
+const errorBanner   = { padding: "10px 14px", borderRadius: 10, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.45)", color: "var(--danger)", fontSize: 13, display: "flex", alignItems: "center", gap: 12 };
+const linkBtnStyle  = { marginLeft: "auto", background: "none", border: "none", color: "var(--danger)", fontWeight: 700, cursor: "pointer", textDecoration: "underline", fontSize: 12 };
+function panel(t)   { return { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 14, overflow: "hidden" }; }
+function panelHeader(t) { return { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${t.border}`, background: t.bg }; }
+function navBtn(t, disabled) { return { padding: "8px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, fontSize: 13, fontWeight: 600, cursor: disabled ? "wait" : "pointer", opacity: disabled ? 0.6 : 1 }; }
+function pgBtn(t, disabled) { return { padding: "4px 10px", borderRadius: 8, border: `1px solid ${t.border}`, background: disabled ? "transparent" : t.card, color: disabled ? t.muted : t.text, fontSize: 12, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }; }

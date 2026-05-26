@@ -29,4 +29,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     Page<Student> search(@Param("query") String query, Pageable pageable);
 
     List<Student> findByRoomNumber(String roomNumber);
+
+    Page<Student> findByRoomIsNotNull(Pageable pageable);
 }

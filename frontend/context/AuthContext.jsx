@@ -5,93 +5,91 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { post, get, tokenService } from "../api/api";
 
 /* ─────────────────────────────────────────────────────────────────
- *  AuthContext — pure auth state and actions.
- *  Theme handling lives in ThemeContext.
- *  Login UI lives in pages/Login.jsx.
+ *  AuthContext — pure auth state and actions backed by /api/auth.
+ *
+ *  Tokens (access + refresh) are owned by api/api.js's tokenService
+ *  so the request interceptor automatically attaches a Bearer token
+ *  to every API call and handles 401 -> refresh -> retry. The user
+ *  profile is the only thing stored directly here, under hms_user.
  *  ───────────────────────────────────────────────────────────────── */
 
-const TOKEN_KEY = "hms_token";
-const USER_KEY  = "hms_user";
+const USER_KEY = "hms_user";
+
+// Legacy key from earlier mock-only auth — clear it on first run so
+// stale data doesn't confuse the api.js interceptor.
+const LEGACY_TOKEN_KEY = "hms_token";
 
 export const AuthContext = createContext({
   user: null,
-  token: null,
   loading: true,
   isAuthenticated: false,
   login: async () => null,
   logout: () => {},
   updateUser: () => {},
+  refreshUser: async () => null,
 });
-
-// ── Mock backend (replace with real API once /auth endpoints are wired) ──
-async function mockLogin(email, password) {
-  // tiny artificial latency so the UI loading state is visible
-  await new Promise((r) => setTimeout(r, 500));
-
-  if (!email || !password) {
-    throw new Error("Please enter your email and password.");
-  }
-
-  if (email === "admin@hostel.com" && password === "admin123") {
-    return {
-      user: { id: 1, name: "Admin User", email, role: "admin" },
-      token: "mock-jwt-token-admin",
-    };
-  }
-
-  if (email === "student@hostel.com" && password === "student123") {
-    return {
-      user: { id: 2, name: "John Doe", email, role: "student" },
-      token: "mock-jwt-token-student",
-    };
-  }
-
-  // Permissive fallback for demo: any non-empty creds become an admin user.
-  // Remove this branch once the real backend is wired.
-  return {
-    user: {
-      id: Date.now(),
-      name: email.split("@")[0],
-      email,
-      role: "admin",
-    },
-    token: `mock-jwt-token-${Date.now()}`,
-  };
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
-  const [token, setToken]     = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Rehydrate from localStorage on mount
+  // Rehydrate session on mount.
   useEffect(() => {
-    try {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
-      const storedUser  = localStorage.getItem(USER_KEY);
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+    let cancelled = false;
+
+    async function rehydrate() {
+      // Drop the legacy mock-era key if it's hanging around.
+      try { localStorage.removeItem(LEGACY_TOKEN_KEY); } catch { /* ignore */ }
+
+      const token = tokenService.getAccess();
+      const stored = localStorage.getItem(USER_KEY);
+
+      if (!token) {
+        if (!cancelled) setLoading(false);
+        return;
       }
-    } catch (err) {
-      // Corrupt localStorage — clear and continue.
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      // eslint-disable-next-line no-console
-      console.warn("AuthContext: failed to rehydrate session", err);
-    } finally {
-      setLoading(false);
+
+      // Optimistically rehydrate user from localStorage so the app
+      // can render immediately.
+      if (stored) {
+        try { if (!cancelled) setUser(JSON.parse(stored)); }
+        catch { localStorage.removeItem(USER_KEY); }
+      }
+
+      // Quietly verify the token is still valid by calling /auth/me.
+      // If it fails, api.js will try a refresh; if that also fails it
+      // dispatches hms:session-expired which our other effect handles.
+      try {
+        const me = await get("/auth/me");
+        if (cancelled) return;
+        if (me) {
+          setUser(me);
+          localStorage.setItem(USER_KEY, JSON.stringify(me));
+        }
+      } catch (err) {
+        // /auth/me failed even after refresh attempt — treat as logged out.
+        if (!cancelled) {
+          tokenService.clearTokens();
+          localStorage.removeItem(USER_KEY);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
+
+    rehydrate();
+    return () => { cancelled = true; };
   }, []);
 
-  // Listen for session-expired events emitted from api.js on 401 refresh failure
+  // Listen for session-expired (emitted from api.js on refresh failure).
   useEffect(() => {
     const onExpired = () => {
-      localStorage.removeItem(TOKEN_KEY);
+      tokenService.clearTokens();
       localStorage.removeItem(USER_KEY);
-      setToken(null);
       setUser(null);
     };
     window.addEventListener("hms:session-expired", onExpired);
@@ -99,18 +97,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    const { user: u, token: tok } = await mockLogin(email, password);
-    localStorage.setItem(TOKEN_KEY, tok);
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
-    setToken(tok);
-    setUser(u);
-    return u;
+    // post() returns response.data via the unwrap interceptor in api.js.
+    // For wrapped responses ({success, data, message}) it returns the
+    // inner `data`, which is the AuthResponse DTO.
+    const response = await post("/auth/login", { email, password });
+
+    if (!response?.accessToken || !response?.user) {
+      throw new Error("Unexpected response from server.");
+    }
+
+    tokenService.setTokens(response.accessToken, response.refreshToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+    setUser(response.user);
+    return response.user;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+    tokenService.clearTokens();
     localStorage.removeItem(USER_KEY);
-    setToken(null);
     setUser(null);
   }, []);
 
@@ -122,17 +126,31 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await get("/auth/me");
+      if (me) {
+        setUser(me);
+        localStorage.setItem(USER_KEY, JSON.stringify(me));
+        return me;
+      }
+    } catch {
+      // Caller decides what to do; we just don't crash here.
+    }
+    return null;
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
-      token,
       loading,
-      isAuthenticated: !!token,
+      isAuthenticated: !!user,
       login,
       logout,
       updateUser,
+      refreshUser,
     }),
-    [user, token, loading, login, logout, updateUser]
+    [user, loading, login, logout, updateUser, refreshUser]
   );
 
   return (

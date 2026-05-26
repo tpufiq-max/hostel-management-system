@@ -1,42 +1,8 @@
+@import "./variables.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: light;
-
-  --bg-primary: #f1f5f9;
-  --bg-secondary: #ffffff;
-  --bg-sidebar: #0f172a;
-
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-
-  --border-color: #e2e8f0;
-
-  --card-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-}
-
-.dark {
-  color-scheme: dark;
-
-  --bg-primary: #020617;
-  --bg-secondary: #0f172a;
-  --bg-sidebar: #020617;
-
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-
-  --border-color: #1e293b;
-
-  --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-}
 
 * {
   margin: 0;
@@ -66,27 +32,29 @@ input,
 textarea,
 select {
   font: inherit;
+  font-family: inherit;
 }
 
 button {
   cursor: pointer;
-  transition: all 0.25s ease;
 }
 
-button:hover {
-  transform: translateY(-1px);
+/* Buttons inherit transition smoothly but no scaling on every element */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-button:active {
-  transform: scale(0.98);
-}
-
+/* Reusable utility classes ─────────────────────────────────────── */
 .card-ui {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 20px;
   box-shadow: var(--card-shadow);
-  transition: all 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .card-ui:hover {
@@ -108,19 +76,26 @@ button:active {
     box-shadow 0.35s ease !important;
 }
 
+/* Scrollbar ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #64748b;
+  background: var(--scrollbar-thumb);
   border-radius: 100px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Layout primitives kept for legacy class consumers ─────────────── */
 .sidebar {
   background: var(--bg-sidebar);
 }
@@ -141,9 +116,55 @@ button:active {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   box-shadow: var(--card-shadow);
-  transition: all 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .dashboard-stat-card:hover {
   transform: translateY(-4px) scale(1.01);
+}
+
+/* Global keyframes used by inline-styled pages ─────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0);     }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1;   }
+  50%      { opacity: 0.5; }
+}
+
+/* Form niceties ────────────────────────────────────────────────── */
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  transition: background-color 9999s ease;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
+
+html {
+  scrollbar-gutter: stable;
 }

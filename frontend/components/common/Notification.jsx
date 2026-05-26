@@ -1,41 +1,74 @@
-import React, { useEffect } from 'react';
+import React from "react";
 
-const Notification = ({ notification, onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
+const TYPE_STYLES = {
+  success: { color: "var(--success)", icon: "✓" },
+  error:   { color: "var(--danger)",  icon: "✕" },
+  info:    { color: "var(--accent)",  icon: "i" },
+  warning: { color: "var(--warning)", icon: "!" },
+};
 
-  const typeStyles = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-  };
-
-  const iconMap = {
-    success: '✓',
-    error: '✕',
-    info: 'ℹ',
-    warning: '⚠',
-  };
+export default function Notification({ notification, onClose }) {
+  const { type = "info", message } = notification;
+  const { color, icon } = TYPE_STYLES[type] || TYPE_STYLES.info;
 
   return (
-    <div className={`mb-3 p-4 rounded-lg border-2 flex items-start gap-3 animate-slideIn ${typeStyles[notification.type] || typeStyles.info}`}>
-      <span className={`text-xl font-bold flex-shrink-0`}>
-        {iconMap[notification.type]}
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "12px 14px",
+        borderRadius: 12,
+        background: "var(--surface)",
+        color: "var(--text)",
+        border: `1px solid ${color}55`,
+        borderLeft: `4px solid ${color}`,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        minWidth: 240,
+        maxWidth: 360,
+        animation: "slideIn 0.25s ease both",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          background: `${color}22`,
+          color,
+          fontSize: 13,
+          fontWeight: 700,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginTop: 1,
+        }}
+      >
+        {icon}
       </span>
-      <div className="flex-1">
-        <p className="font-medium">{notification.message}</p>
-      </div>
+      <div style={{ flex: 1, fontSize: 13, lineHeight: 1.45 }}>{message}</div>
       <button
+        type="button"
         onClick={onClose}
-        className="text-lg font-bold opacity-50 hover:opacity-100 transition-opacity"
+        aria-label="Dismiss notification"
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--muted)",
+          fontSize: 16,
+          lineHeight: 1,
+          cursor: "pointer",
+          padding: 2,
+          flexShrink: 0,
+        }}
       >
         ×
       </button>
     </div>
   );
-};
-
-export default Notification;
+}

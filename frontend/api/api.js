@@ -84,8 +84,14 @@ api.interceptors.response.use(
     if (import.meta.env.DEV) {
       console.log(`[API ✓] ${response.status} ${response.config.url}`);
     }
-    // Unwrap data envelope if backend wraps in { success, data, message }
-    return response.data?.data !== undefined ? response.data : response.data;
+    // Backend wraps everything in { success, data, message }.
+    // Unwrap so callers receive the inner `data` directly when present;
+    // otherwise return the raw body (for endpoints that don't wrap).
+    const body = response.data;
+    if (body && typeof body === "object" && "data" in body) {
+      return body.data;
+    }
+    return body;
   },
 
   async (error) => {

@@ -1,17 +1,41 @@
-import React, { useContext } from 'react';
-import { Navigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
+import React, { useContext } from "react";
+import { Navigate } from "react-router-dom";
+import { AuthContext } from "../../context/AuthContext";
 
+/**
+ * Guards routes that require authentication and (optionally) a role.
+ *
+ *   <ProtectedRoute><Dashboard /></ProtectedRoute>
+ *   <ProtectedRoute allowedRoles={["admin"]}><Students /></ProtectedRoute>
+ */
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, isAuthenticated, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div
+        style={{
+          minHeight: "60vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 14,
+          color: "var(--muted)",
+          fontFamily: "'Inter', system-ui, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            border: "3px solid var(--border)",
+            borderTop: "3px solid var(--accent)",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
+        <div style={{ fontSize: 13 }}>Checking session…</div>
       </div>
     );
   }
@@ -20,32 +44,105 @@ export default function ProtectedRoute({ children, allowedRoles = [] }) {
     return <Navigate to="/login" replace />;
   }
 
-  // If no roles specified, allow all authenticated users
-  if (allowedRoles.length === 0) {
-    return children;
-  }
-
-  // Check if user has required role
-  if (!allowedRoles.includes(user?.role)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">
-            You don't have permission to access this page.
-          </p>
-          <p className="text-sm text-gray-500">
-            Your role: <span className="font-medium capitalize">{user?.role}</span>
-          </p>
-        </div>
-      </div>
-    );
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
+    return <ForbiddenScreen role={user?.role} />;
   }
 
   return children;
+}
+
+function ForbiddenScreen({ role }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        minHeight: "70vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 460,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 16,
+          padding: 28,
+          textAlign: "center",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            background: "rgba(248,113,113,0.15)",
+            color: "var(--danger)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 26,
+            fontWeight: 700,
+            margin: "0 auto 16px",
+          }}
+        >
+          ⓘ
+        </div>
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 20,
+            fontWeight: 700,
+            color: "var(--text)",
+          }}
+        >
+          Access denied
+        </h1>
+        <p
+          style={{
+            margin: "8px 0 0",
+            fontSize: 13,
+            color: "var(--muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          Your role
+          {role ? (
+            <>
+              {" ("}
+              <strong style={{ color: "var(--text)" }}>{role}</strong>
+              {") "}
+            </>
+          ) : (
+            " "
+          )}
+          doesn't have permission to view this page.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          style={{
+            marginTop: 20,
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--card)",
+            color: "var(--text)",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          ← Go back
+        </button>
+      </div>
+    </div>
+  );
 }

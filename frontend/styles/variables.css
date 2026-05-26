@@ -1,252 +1,72 @@
-import React, {
-  createContext,
-  useEffect,
-  useMemo,
-  useState,
-  useCallback,
-} from "react";
+/* ─────────────────────────────────────────────────────────────────
+ *  HMS — Theme tokens (single source of truth)
+ *  Both naming conventions are exposed:
+ *    - Short  (--bg, --surface, --text, --muted, --accent, ...)
+ *    - Legacy (--bg-primary, --bg-secondary, --text-primary, ...)
+ *  so existing class-based CSS and inline-style components both work.
+ *  ───────────────────────────────────────────────────────────────── */
 
-// ── Must match your index.css :root and .dark variables exactly ───────────────
-export const darkTheme = {
-  bg:      "#020617",
-  surface: "#0b1220",
-  card:    "#0f172a",
-  border:  "#1e293b",
-  text:    "#e2e8f0",
-  muted:   "#94a3b8",
-  accent:  "#60a5fa",
-  success: "#22c55e",
-  danger:  "#f87171",
-  warning: "#fbbf24",
-  gold:    "#f59e0b",
-  purple:  "#a855f7",
-};
+:root {
+  color-scheme: light;
 
-export const lightTheme = {
-  bg:      "#f4f4f4",
-  surface: "#ffffff",
-  card:    "#ffffff",
-  border:  "#e2e8f0",
-  text:    "#102a43",
-  muted:   "#475569",
-  accent:  "#3b82f6",
-  success: "#16a34a",
-  danger:  "#ef4444",
-  warning: "#f59e0b",
-  gold:    "#d97706",
-  purple:  "#9333ea",
-};
+  /* Short tokens (used by inline styles + ThemeContext) */
+  --bg:        #f1f5f9;
+  --surface:   #ffffff;
+  --card:      #ffffff;
+  --border:    #e2e8f0;
+  --text:      #0f172a;
+  --muted:     #475569;
+  --accent:    #2563eb;
+  --accent-hover: #1d4ed8;
+  --success:   #16a34a;
+  --danger:    #ef4444;
+  --warning:   #f59e0b;
+  --gold:      #d97706;
+  --purple:    #9333ea;
+  --background: var(--bg);
 
-// ── These must match your CSS variables in index.css exactly ─────────────────
-const CSS_VARS = {
-  dark: {
-    "--background": "#020617",
-    "--surface":    "#0b1220",
-    "--text":       "#e2e8f0",
-    "--muted":      "#94a3b8",
-    "--accent":     "#60a5fa",
-    "--success":    "#22c55e",
-    "--success-contrast": "#0f5132",
-    "--warning":    "#fbbf24",
-    "--warning-contrast": "#7c2d12",
-    "--danger":     "#f87171",
-    "--danger-contrast":  "#5f2121",
-    "--scrollbar-track":       "#1e293b",
-    "--scrollbar-thumb":       "#475569",
-    "--scrollbar-thumb-hover": "#64748b",
-  },
-  light: {
-    "--background": "#f4f4f4",
-    "--surface":    "#ffffff",
-    "--text":       "#102a43",
-    "--muted":      "#475569",
-    "--accent":     "#3b82f6",
-    "--success":    "#16a34a",
-    "--success-contrast": "#064e3b",
-    "--warning":    "#f59e0b",
-    "--warning-contrast": "#92400e",
-    "--danger":     "#ef4444",
-    "--danger-contrast":  "#7f1d1d",
-    "--scrollbar-track":       "#f1f5f9",
-    "--scrollbar-thumb":       "#cbd5e1",
-    "--scrollbar-thumb-hover": "#94a3b8",
-  },
-};
+  /* Legacy aliases (used by .card-ui, .navbar-ui, .dashboard-stat-card, etc.) */
+  --bg-primary:     var(--bg);
+  --bg-secondary:   var(--surface);
+  --bg-sidebar:     #0f172a;
+  --text-primary:   var(--text);
+  --text-secondary: var(--muted);
+  --border-color:   var(--border);
+  --card-shadow:    0 4px 12px rgba(15, 23, 42, 0.08);
 
-// ── Context ───────────────────────────────────────────────────────────────────
-export const ThemeContext = createContext({
-  theme:       "dark",
-  toggleTheme: () => {},
-  t:           darkTheme,
-  isDark:      true,
-  darkTheme,
-  lightTheme,
-});
+  /* Scrollbar */
+  --scrollbar-track:       #f1f5f9;
+  --scrollbar-thumb:       #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
 
-// ── Provider ──────────────────────────────────────────────────────────────────
-export function ThemeProvider({ children }) {
-  const [theme,   setTheme]   = useState("dark");
-  const [mounted, setMounted] = useState(false);
+.dark {
+  color-scheme: dark;
 
-  // ── 1. Rehydrate on mount ─────────────────────────────────────────────────
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_theme");
+  --bg:        #020617;
+  --surface:   #0b1220;
+  --card:      #0f172a;
+  --border:    #1e293b;
+  --text:      #f8fafc;
+  --muted:     #94a3b8;
+  --accent:    #3b82f6;
+  --accent-hover: #60a5fa;
+  --success:   #22c55e;
+  --danger:    #f87171;
+  --warning:   #fbbf24;
+  --gold:      #f59e0b;
+  --purple:    #a855f7;
+  --background: var(--bg);
 
-    if (saved === "dark" || saved === "light") {
-      setTheme(saved);
-    } else {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setTheme(prefersDark ? "dark" : "light");
-    }
+  --bg-primary:     var(--bg);
+  --bg-secondary:   var(--surface);
+  --bg-sidebar:     #020617;
+  --text-primary:   var(--text);
+  --text-secondary: var(--muted);
+  --border-color:   var(--border);
+  --card-shadow:    0 8px 24px rgba(0, 0, 0, 0.45);
 
-    setMounted(true);
-  }, []);
-
-  // ── 2. Apply .dark class + CSS vars on every theme change ─────────────────
-  useEffect(() => {
-    if (!mounted) return;
-
-    const html = document.documentElement;
-    const body = document.body;
-
-    // Smooth transition (matches your existing .theme-transition CSS)
-    html.classList.add("theme-transition");
-    body.classList.add("theme-transition");
-
-    // Toggle .dark class — your CSS file uses this to switch variables
-    if (theme === "dark") {
-      html.classList.add("dark");
-      body.classList.add("dark");
-    } else {
-      html.classList.remove("dark");
-      body.classList.remove("dark");
-    }
-
-    // Sync JS CSS vars with your CSS file variables
-    const vars = CSS_VARS[theme];
-    Object.entries(vars).forEach(([k, v]) => {
-      html.style.setProperty(k, v);
-    });
-
-    // Prevent white flash
-    body.style.background = vars["--background"];
-    body.style.color      = vars["--text"];
-    body.style.transition = "background 0.3s, color 0.3s";
-
-    localStorage.setItem("hms_theme", theme);
-
-    const timeout = setTimeout(() => {
-      html.classList.remove("theme-transition");
-      body.classList.remove("theme-transition");
-    }, 400);
-
-    return () => clearTimeout(timeout);
-  }, [theme, mounted]);
-
-  // ── 3. Toggle ─────────────────────────────────────────────────────────────
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === "dark" ? "light" : "dark"));
-  }, []);
-
-  // ── 4. Memoised context value ─────────────────────────────────────────────
-  const value = useMemo(() => ({
-    theme,
-    toggleTheme,
-    t:      theme === "dark" ? darkTheme : lightTheme,
-    isDark: theme === "dark",
-    darkTheme,
-    lightTheme,
-  }), [theme, toggleTheme]);
-
-  // ── 5. Block render until mounted (avoids flash) ──────────────────────────
-  if (!mounted) {
-    return (
-      <div style={{
-        minHeight:      "100vh",
-        background:     "#020617",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        flexDirection:  "column",
-        gap:            16,
-        fontFamily:     "'Inter', system-ui, sans-serif",
-      }}>
-        <div style={{
-          width:      44,
-          height:     44,
-          border:     "3px solid #1e293b",
-          borderTop:  "3px solid #60a5fa",
-          borderRadius: "50%",
-          animation:  "spin 0.8s linear infinite",
-        }} />
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Initialising theme...
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  return (
-    <ThemeContext.Provider value={value}>
-      <style>{`
-        /* Smooth transitions */
-        .theme-transition,
-        .theme-transition * {
-          transition:
-            background-color 0.3s ease,
-            border-color     0.3s ease,
-            color            0.3s ease !important;
-        }
-
-        /* Scrollbar — uses your CSS variables */
-        ::-webkit-scrollbar        { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
-        ::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
-
-        /* Text selection */
-        ::selection {
-          background: var(--accent);
-          color: #fff;
-          opacity: 0.3;
-        }
-
-        /* Input autofill fix */
-        input:-webkit-autofill {
-          -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
-          -webkit-text-fill-color: var(--text) !important;
-        }
-
-        /* Global animations used by all pages */
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0);    }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(-10px); }
-          to   { opacity: 1; transform: translateX(0);     }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1;   }
-          50%       { opacity: 0.5; }
-        }
-
-        /* Select options */
-        select option { background: var(--surface); color: var(--text); }
-
-        /* Base */
-        *, *::before, *::after { box-sizing: border-box; }
-        html { scrollbar-gutter: stable; }
-      `}</style>
-      {children}
-    </ThemeContext.Provider>
-  );
+  --scrollbar-track:       #1e293b;
+  --scrollbar-thumb:       #475569;
+  --scrollbar-thumb-hover: #64748b;
 }

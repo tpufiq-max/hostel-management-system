@@ -1,284 +1,261 @@
-import React, { useState } from 'react';
-import Button from '../components/common/Button';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import LoadingSkeleton from "../components/common/LoadingSkeleton";
+import { ThemeContext } from "../context/ThemeContext";
+import { useNotification } from "../context/NotificationContext";
+import { studentService } from "../features/student/studentService";
+import { feesService } from "../features/fees/feesService";
+
+const PAGE_SIZE = 50;
+
+const FEES_TONE = {
+  PAID:    { color: "var(--success)", label: "Paid"    },
+  PENDING: { color: "var(--warning)", label: "Pending" },
+  OVERDUE: { color: "var(--danger)",  label: "Overdue" },
+};
+
+function initials(name) {
+  if (!name) return "?";
+  return name.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+}
 
 export default function StudentProfiles() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [sortBy, setSortBy] = useState('name');
+  const { t } = useContext(ThemeContext);
+  const toast = useNotification();
 
-  const students = [
-    {
-      id: 1,
-      name: 'Rahul Kumar',
-      email: 'rahul@example.com',
-      phone: '9876543210',
-      room: '101',
-      floor: '1',
-      joinDate: '2024-01-15',
-      status: 'active',
-      feesStatus: 'paid',
-      balance: 0,
-      profileImage: '👨‍🎓'
-    },
-    {
-      id: 2,
-      name: 'Priya Sharma',
-      email: 'priya@example.com',
-      phone: '9876543211',
-      room: '205',
-      floor: '2',
-      joinDate: '2024-02-20',
-      status: 'active',
-      feesStatus: 'pending',
-      balance: 2500,
-      profileImage: '👩‍🎓'
-    },
-    {
-      id: 3,
-      name: 'Aditya Patel',
-      email: 'aditya@example.com',
-      phone: '9876543212',
-      room: '310',
-      floor: '3',
-      joinDate: '2023-08-10',
-      status: 'active',
-      feesStatus: 'paid',
-      balance: 0,
-      profileImage: '👨‍🎓'
-    },
-    {
-      id: 4,
-      name: 'Neha Singh',
-      email: 'neha@example.com',
-      phone: '9876543213',
-      room: '215',
-      floor: '2',
-      joinDate: '2024-03-05',
-      status: 'inactive',
-      feesStatus: 'pending',
-      balance: 5000,
-      profileImage: '👩‍🎓'
-    },
-    {
-      id: 5,
-      name: 'Vikram Das',
-      email: 'vikram@example.com',
-      phone: '9876543214',
-      room: '115',
-      floor: '1',
-      joinDate: '2024-01-22',
-      status: 'active',
-      feesStatus: 'paid',
-      balance: 0,
-      profileImage: '👨‍🎓'
-    },
-  ];
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const filteredStudents = students
-    .filter(student => 
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'room') return parseInt(a.room) - parseInt(b.room);
-      if (sortBy === 'status') return a.status.localeCompare(b.status);
+  const [selected, setSelected] = useState(null);
+  const [studentFees, setStudentFees] = useState([]);
+  const [feesLoading, setFeesLoading] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = debouncedSearch
+        ? await studentService.search({ query: debouncedSearch, page: 0, size: PAGE_SIZE })
+        : await studentService.list({ page: 0, size: PAGE_SIZE });
+      setStudents(result?.content || []);
+    } catch (err) {
+      setError(err?.message || "Failed to load students.");
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  // When a student is selected, fetch their fee history
+  useEffect(() => {
+    if (!selected) { setStudentFees([]); return; }
+    let cancelled = false;
+    setFeesLoading(true);
+    feesService.byStudent(selected.id)
+      .then((data) => { if (!cancelled) setStudentFees(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) toast.error("Couldn't load this student's fee history."); })
+      .finally(() => { if (!cancelled) setFeesLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  const sorted = useMemo(() => {
+    const copy = [...students];
+    copy.sort((a, b) => {
+      if (sortBy === "name") return (a.name || "").localeCompare(b.name || "");
+      if (sortBy === "room") return String(a.roomNumber || "").localeCompare(String(b.roomNumber || ""));
+      if (sortBy === "fees") return (a.feesStatus || "").localeCompare(b.feesStatus || "");
       return 0;
     });
+    return copy;
+  }, [students, sortBy]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, color: t.text }}>
       <div>
-        <h1 className="text-4xl font-bold" style={{color: 'var(--text)'}}>Student Profiles</h1>
-        <p className="mt-2" style={{color: 'var(--muted)'}}>Manage and view student information</p>
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: t.text }}>Student profiles</h1>
+        <p style={{ margin: "4px 0 0", color: t.muted, fontSize: 13 }}>
+          Browse student records and view fee history.
+          {!loading && ` ${students.length} student${students.length === 1 ? "" : "s"}.`}
+        </p>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <input
-          type="text"
-          placeholder="Search by name or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1 px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none transition-colors"
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or email…"
+          style={{ ...inputStyle(t), minWidth: 240, flex: "1 1 240px" }}
+          aria-label="Search student profiles"
         />
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-4 py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none transition-colors"
-        >
-          <option value="name">Sort by Name</option>
-          <option value="room">Sort by Room</option>
-          <option value="status">Sort by Status</option>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle(t)} aria-label="Sort by">
+          <option value="name">Sort by name</option>
+          <option value="room">Sort by room</option>
+          <option value="fees">Sort by fees</option>
         </select>
       </div>
 
-      {/* Students Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStudents.map(student => (
-          <div
-            key={student.id}
-            onClick={() => setSelectedStudent(student)}
-            className="bg-[var(--bg-secondary)] rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:shadow-lg transition-all cursor-pointer overflow-hidden group"
-          >
-            {/* Header with gradient */}
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white flex items-center gap-4">
-              <div className="text-4xl">{student.profileImage}</div>
-              <div>
-                <h3 className="font-bold text-lg">{student.name}</h3>
-                <p className="text-blue-100">Room {student.room}</p>
-              </div>
-            </div>
+      {error && !loading && (
+        <div role="alert" style={errorBanner}>
+          {error}
+          <button type="button" onClick={reload} style={linkButton}>Retry</button>
+        </div>
+      )}
 
-            {/* Content */}
-            <div className="p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>📧</span>
-                <span className="truncate">{student.email}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>📱</span>
-                <span>{student.phone}</span>
-              </div>
-
-              {/* Status badges */}
-              <div className="flex gap-2 pt-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  student.status === 'active'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {student.status === 'active' ? '✓ Active' : '○ Inactive'}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  student.feesStatus === 'paid'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {student.feesStatus === 'paid' ? '✓ Fees Paid' : '⏳ Pending'}
-                </span>
-              </div>
-
-              {/* Balance */}
-              {student.balance > 0 && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
-                  <p className="text-sm font-semibold text-yellow-900">
-                    Balance Due: ₹{student.balance.toLocaleString()}
-                  </p>
-                </div>
-              )}
-
-              {/* Action button */}
-              <Button
-                variant="outline"
-                size="sm"
-                fullWidth
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedStudent(student);
-                }}
-              >
-                View Details
-              </Button>
-            </div>
+      {loading ? (
+        <LoadingSkeleton count={5} />
+      ) : sorted.length === 0 ? (
+        <div style={{ padding: "40px 20px", textAlign: "center", color: t.muted, background: t.surface, border: `1px dashed ${t.border}`, borderRadius: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 6 }}>
+            No students{debouncedSearch ? " match this search" : ""}
           </div>
-        ))}
-      </div>
-
-      {/* Modal for selected student */}
-      {selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-[var(--bg-secondary)] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white sticky top-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl">{selectedStudent.profileImage}</div>
-                  <div>
-                    <h2 className="text-2xl font-bold">{selectedStudent.name}</h2>
-                    <p className="text-blue-100">Room {selectedStudent.room} • Floor {selectedStudent.floor}</p>
+          <div style={{ fontSize: 13 }}>
+            {debouncedSearch ? "Try a different query." : "Once students are added on the Students page, they'll appear here."}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+          {sorted.map((s) => {
+            const tone = FEES_TONE[s.feesStatus] || FEES_TONE.PENDING;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelected(s)}
+                style={{
+                  textAlign: "left",
+                  padding: 16,
+                  borderRadius: 14,
+                  background: t.surface,
+                  border: `1px solid ${t.border}`,
+                  cursor: "pointer",
+                  transition: "border-color 0.15s, transform 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.accent; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: `linear-gradient(135deg, ${t.accent}, ${t.purple})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>
+                    {initials(s.name)}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: t.text, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                    {s.email && <div style={{ fontSize: 11, color: t.muted, overflow: "hidden", textOverflow: "ellipsis" }}>{s.email}</div>}
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedStudent(null)}
-                  className="text-2xl hover:opacity-80 transition-opacity"
-                >
-                  ×
-                </button>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: t.muted }}>
+                  {s.rollNumber && <div>Roll: <strong style={{ color: t.text }}>{s.rollNumber}</strong></div>}
+                  {s.course && <div>Course: <strong style={{ color: t.text }}>{s.course}</strong>{s.year ? ` (Year ${s.year})` : ""}</div>}
+                  {s.roomNumber && <div>Room: <strong style={{ color: t.text }}>{s.roomNumber}</strong></div>}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 10, borderTop: `1px solid ${t.border}` }}>
+                  <span style={badge(tone.color)}>{tone.label}</span>
+                  {!s.isActive && <span style={{ fontSize: 11, color: t.muted }}>Inactive</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Selected student modal-like sidebar */}
+      {selected && (
+        <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50, display: "flex", justifyContent: "flex-end" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 100%)", height: "100vh", background: t.surface, borderLeft: `1px solid ${t.border}`, padding: 24, overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${t.accent}, ${t.purple})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700 }}>
+                  {initials(selected.name)}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: t.text }}>{selected.name}</h2>
+                  <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{selected.email}</div>
+                </div>
               </div>
+              <button type="button" onClick={() => setSelected(null)} aria-label="Close" style={{ ...secondaryButton(t), padding: "6px 12px" }}>×</button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Contact Info */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Contact Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-semibold text-gray-900">{selectedStudent.email}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Phone</p>
-                    <p className="font-semibold text-gray-900">{selectedStudent.phone}</p>
-                  </div>
-                </div>
-              </div>
+            <DetailGrid t={t} student={selected} />
 
-              {/* Accommodation Details */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Accommodation</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-                    <p className="text-sm text-blue-600 font-semibold">Room Number</p>
-                    <p className="text-2xl font-bold text-blue-900">{selectedStudent.room}</p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-                    <p className="text-sm text-blue-600 font-semibold">Floor</p>
-                    <p className="text-2xl font-bold text-blue-900">{selectedStudent.floor}</p>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-                    <p className="text-sm text-blue-600 font-semibold">Status</p>
-                    <p className="text-2xl font-bold text-blue-900">{selectedStudent.status === 'active' ? '✓ Active' : 'Inactive'}</p>
-                  </div>
-                </div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: "20px 0 10px", color: t.text }}>Fee history</h3>
+            {feesLoading ? (
+              <LoadingSkeleton count={2} />
+            ) : studentFees.length === 0 ? (
+              <div style={{ padding: 12, fontSize: 12, color: t.muted, background: t.bg, borderRadius: 10, border: `1px dashed ${t.border}` }}>
+                No fee records on file.
               </div>
-
-              {/* Financial Status */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Financial Status</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <span className="font-semibold text-gray-700">Fees Status</span>
-                    <span className={`px-4 py-2 rounded-full font-bold text-sm ${
-                      selectedStudent.feesStatus === 'paid'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {selectedStudent.feesStatus === 'paid' ? '✓ Paid' : '⏳ Pending'}
-                    </span>
-                  </div>
-                  {selectedStudent.balance > 0 && (
-                    <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
-                      <span className="font-semibold text-yellow-900">Outstanding Balance</span>
-                      <span className="text-2xl font-bold text-yellow-900">₹{selectedStudent.balance.toLocaleString()}</span>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {studentFees.map((f) => {
+                  const tone = FEES_TONE[f.paymentStatus] || FEES_TONE.PENDING;
+                  return (
+                    <div key={f.id} style={{ padding: 12, background: t.bg, border: `1px solid ${t.border}`, borderLeft: `3px solid ${tone.color}`, borderRadius: 10, fontSize: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <strong style={{ color: t.text, fontSize: 13 }}>₹ {Number(f.amount || 0).toLocaleString()}</strong>
+                        <span style={badge(tone.color)}>{tone.label}</span>
+                      </div>
+                      <div style={{ color: t.muted }}>
+                        {f.feeType && <>{f.feeType}{f.semester ? ` · ${f.semester}` : ""} · </>}
+                        Due {f.dueDate || "—"}
+                        {f.paymentDate && <> · Paid {f.paymentDate}</>}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t-2 border-gray-200">
-                <Button variant="primary" fullWidth>
-                  📧 Send Message
-                </Button>
-                <Button variant="secondary" fullWidth>
-                  📋 View Complaints
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
+function DetailGrid({ t, student }) {
+  const rows = [
+    ["Roll number", student.rollNumber],
+    ["Course", student.course],
+    ["Department", student.department],
+    ["Year", student.year],
+    ["Room number", student.roomNumber],
+    ["Bed number", student.bedNumber],
+    ["Phone", student.phone],
+    ["Gender", student.gender],
+    ["Blood group", student.bloodGroup],
+    ["Date of birth", student.dateOfBirth],
+    ["Admission date", student.admissionDate],
+    ["Guardian", student.guardianName],
+    ["Guardian phone", student.guardianPhone],
+    ["Address", student.address],
+  ];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      {rows.filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => (
+        <div key={k} style={{ background: t.bg, borderRadius: 8, padding: "8px 10px", border: `1px solid ${t.border}` }}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: t.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>{k}</div>
+          <div style={{ fontSize: 13, color: t.text, marginTop: 2, wordBreak: "break-word" }}>{String(v)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function inputStyle(t) { return { padding: "9px 12px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, fontSize: 13, outline: "none" }; }
+function secondaryButton(t) { return { padding: "9px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, fontSize: 13, fontWeight: 600, cursor: "pointer" }; }
+function badge(color) { return { display: "inline-block", padding: "2px 10px", fontSize: 10, fontWeight: 700, borderRadius: 999, color, background: `${color}22`, border: `1px solid ${color}55` }; }
+
+const errorBanner = { padding: "10px 14px", borderRadius: 10, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.45)", color: "var(--danger)", fontSize: 13, display: "flex", alignItems: "center", gap: 12 };
+const linkButton = { marginLeft: "auto", background: "none", border: "none", color: "var(--danger)", fontWeight: 700, cursor: "pointer", textDecoration: "underline", fontSize: 12 };

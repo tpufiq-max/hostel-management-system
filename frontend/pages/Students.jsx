@@ -1,308 +1,345 @@
-import React, { useState, useEffect } from 'react';
-import StudentTable from '../features/student/components/StudentTable';
-import StudentForm from '../features/student/components/StudentForm';
-import Modal from '../components/common/Modal';
-import Card from '../components/common/Card';
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import Modal from "../components/common/Modal";
+import LoadingSkeleton from "../components/common/LoadingSkeleton";
+import { ThemeContext } from "../context/ThemeContext";
+import { useNotification } from "../context/NotificationContext";
+import { studentService } from "../features/student/studentService";
+
+const PAGE_SIZE = 20;
+
+const FEES_TONE = {
+  PAID:    "var(--success)",
+  PENDING: "var(--warning)",
+  OVERDUE: "var(--danger)",
+};
+
+const emptyForm = {
+  name: "",
+  email: "",
+  phone: "",
+  rollNumber: "",
+  course: "",
+  department: "",
+  year: "",
+  roomNumber: "",
+  gender: "Male",
+  feesStatus: "PENDING",
+  isActive: true,
+};
+
+function initials(name) {
+  if (!name) return "?";
+  return name.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+}
 
 export default function Students() {
-  const [students, setStudents] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
+  const { t } = useContext(ThemeContext);
+  const toast = useNotification();
+
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [data, setData] = useState({ content: [], totalElements: 0, totalPages: 0, number: 0 });
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    inactive: 0,
-    roomsOccupied: 0
-  });
+  const [error, setError] = useState(null);
 
-  // Load initial data
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [busyRowId, setBusyRowId] = useState(null);
+
+  // Debounce search input by 300ms
   useEffect(() => {
-    const loadStudents = async () => {
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
 
-        // For now, we'll use the sample data from StudentTable
-        const sampleStudents = [
-          {
-            id: 1,
-            name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '+1 234 567 8900',
-            room: '101',
-            course: 'Computer Science',
-            year: '3rd Year',
-            status: 'Active',
-            joinDate: '2023-08-15',
-            emergencyContact: '+1 234 567 8901',
-            address: '123 Main St, City, State'
-          },
-          {
-            id: 2,
-            name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            phone: '+1 234 567 8901',
-            room: '102',
-            course: 'Mechanical Engineering',
-            year: '2nd Year',
-            status: 'Active',
-            joinDate: '2023-08-20',
-            emergencyContact: '+1 234 567 8902',
-            address: '456 Oak Ave, City, State'
-          },
-          {
-            id: 3,
-            name: 'Mike Johnson',
-            email: 'mike.johnson@example.com',
-            phone: '+1 234 567 8902',
-            room: '103',
-            course: 'Electrical Engineering',
-            year: '4th Year',
-            status: 'Inactive',
-            joinDate: '2022-08-10',
-            emergencyContact: '+1 234 567 8903',
-            address: '789 Pine Rd, City, State'
-          },
-          {
-            id: 4,
-            name: 'Sarah Wilson',
-            email: 'sarah.wilson@example.com',
-            phone: '+1 234 567 8903',
-            room: '104',
-            course: 'Civil Engineering',
-            year: '1st Year',
-            status: 'Active',
-            joinDate: '2024-08-25',
-            emergencyContact: '+1 234 567 8904',
-            address: '321 Elm St, City, State'
-          },
-          {
-            id: 5,
-            name: 'David Brown',
-            email: 'david.brown@example.com',
-            phone: '+1 234 567 8904',
-            room: '105',
-            course: 'Business Administration',
-            year: '2nd Year',
-            status: 'Active',
-            joinDate: '2023-08-18',
-            emergencyContact: '+1 234 567 8905',
-            address: '654 Maple Dr, City, State'
-          }
-        ];
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = debouncedSearch
+        ? await studentService.search({ query: debouncedSearch, page, size: PAGE_SIZE })
+        : await studentService.list({ page, size: PAGE_SIZE });
+      setData(result || { content: [], totalElements: 0, totalPages: 0, number: 0 });
+    } catch (err) {
+      setError(err?.message || "Failed to load students.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedSearch]);
 
-        setStudents(sampleStudents);
-        updateStats(sampleStudents);
-      } catch (error) {
-        console.error('Error loading students:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  useEffect(() => { reload(); }, [reload]);
 
-    loadStudents();
-  }, []);
+  // Reset to page 0 whenever the search changes
+  useEffect(() => { setPage(0); }, [debouncedSearch]);
 
-  const updateStats = (studentList) => {
-    const total = studentList.length;
-    const active = studentList.filter(s => s.status === 'Active').length;
-    const inactive = studentList.filter(s => s.status === 'Inactive').length;
-    const roomsOccupied = new Set(studentList.filter(s => s.status === 'Active').map(s => s.room)).size;
+  function patch(p) { setForm(f => ({ ...f, ...p })); }
 
-    setStats({ total, active, inactive, roomsOccupied });
-  };
+  function openCreate() {
+    setEditing(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  }
 
-  const handleAddStudent = () => {
-    setEditingStudent(null);
-    setIsModalOpen(true);
-  };
+  function openEdit(s) {
+    setEditing(s);
+    setForm({
+      name: s.name || "",
+      email: s.email || "",
+      phone: s.phone || "",
+      rollNumber: s.rollNumber || "",
+      course: s.course || "",
+      department: s.department || "",
+      year: s.year ?? "",
+      roomNumber: s.roomNumber || "",
+      gender: s.gender || "Male",
+      feesStatus: s.feesStatus || "PENDING",
+      isActive: s.isActive ?? true,
+    });
+    setShowForm(true);
+  }
 
-  const handleEditStudent = (student) => {
-    setEditingStudent(student);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteStudent = async (studentId) => {
-    if (!window.confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Name and email are required.");
       return;
     }
-
+    setSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const updatedStudents = students.filter(s => s.id !== studentId);
-      setStudents(updatedStudents);
-      updateStats(updatedStudents);
-    } catch (error) {
-      console.error('Error deleting student:', error);
-      alert('Failed to delete student. Please try again.');
-    }
-  };
-
-  const handleStatusChange = async (studentId, newStatus) => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const updatedStudents = students.map(student =>
-        student.id === studentId
-          ? { ...student, status: newStatus }
-          : student
-      );
-      setStudents(updatedStudents);
-      updateStats(updatedStudents);
-    } catch (error) {
-      console.error('Error updating student status:', error);
-      alert('Failed to update student status. Please try again.');
-    }
-  };
-
-  const handleSubmitStudent = async (studentData) => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      if (editingStudent) {
-        // Update existing student
-        const updatedStudents = students.map(student =>
-          student.id === editingStudent.id
-            ? { ...studentData, id: editingStudent.id }
-            : student
-        );
-        setStudents(updatedStudents);
-        updateStats(updatedStudents);
+      const payload = { ...form, year: form.year === "" ? null : Number(form.year) };
+      if (editing) {
+        await studentService.update(editing.id, payload);
+        toast.success("Student updated.");
       } else {
-        // Add new student
-        const newStudent = { ...studentData, id: Date.now() };
-        const updatedStudents = [...students, newStudent];
-        setStudents(updatedStudents);
-        updateStats(updatedStudents);
+        await studentService.create(payload);
+        toast.success("Student created.");
       }
-
-      setIsModalOpen(false);
-      setEditingStudent(null);
-    } catch (error) {
-      console.error('Error saving student:', error);
-      alert('Failed to save student. Please try again.');
+      setShowForm(false);
+      await reload();
+    } catch (err) {
+      toast.error(err?.message || "Failed to save student.");
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingStudent(null);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+  async function handleDelete(s) {
+    if (busyRowId) return;
+    if (!window.confirm(`Delete student "${s.name}"?`)) return;
+    setBusyRowId(s.id);
+    try {
+      await studentService.remove(s.id);
+      toast.success("Student deleted.");
+      await reload();
+    } catch (err) {
+      toast.error(err?.message || "Failed to delete student.");
+    } finally {
+      setBusyRowId(null);
+    }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, color: t.text }}>
+      <div style={headerRow}>
         <div>
-          <h1 className="text-3xl font-bold" style={{color: 'var(--text)'}}>Students Management</h1>
-          <p className="mt-2" style={{color: 'var(--muted)'}}>Manage student records and hostel allocation</p>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, color: t.text }}>Students</h1>
+          <p style={{ margin: "4px 0 0", color: t.muted, fontSize: 13 }}>
+            Manage student records.
+            {!loading && ` ${data.totalElements ?? data.content.length} total.`}
+          </p>
         </div>
-        <button
-          onClick={handleAddStudent}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-medium transition-colors duration-200 shadow-lg"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Student
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, roll…"
+            style={{ ...inputStyle(t), minWidth: 240 }}
+            aria-label="Search students"
+          />
+          <button type="button" onClick={openCreate} style={primaryButton(t)}>
+            + Add student
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6 hover:shadow-md transition-all" style={{backgroundColor: 'var(--surface)', borderLeft: '4px solid var(--accent)'}}>
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg" style={{backgroundColor: `rgba(59,130,246,0.1)`}}>
-              <svg className="w-6 h-6" style={{color: 'var(--accent)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium" style={{color: 'var(--muted)'}}>Total Students</p>
-              <p className="text-2xl font-bold" style={{color: 'var(--text)'}}>{stats.total}</p>
-            </div>
-          </div>
-        </Card>
+      <div style={panel(t)}>
+        <div style={{ ...cardHeader(t) }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: t.text }}>Roster</h3>
+        </div>
 
-        <Card className="p-6 hover:shadow-md transition-all" style={{backgroundColor: 'var(--surface)', borderLeft: '4px solid var(--success)'}}>
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg" style={{backgroundColor: `rgba(34,197,94,0.1)`}}>
-              <svg className="w-6 h-6" style={{color: 'var(--success)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium" style={{color: 'var(--muted)'}}>Active Students</p>
-              <p className="text-2xl font-bold" style={{color: 'var(--text)'}}>{stats.active}</p>
-            </div>
+        {error && !loading && (
+          <div role="alert" style={errorBanner}>
+            {error}
+            <button type="button" onClick={reload} style={linkButton}>Retry</button>
           </div>
-        </Card>
+        )}
 
-        <Card className="p-6 hover:shadow-md transition-all" style={{backgroundColor: 'var(--surface)', borderLeft: '4px solid var(--danger)'}}>
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg" style={{backgroundColor: `rgba(239,68,68,0.1)`}}>
-              <svg className="w-6 h-6" style={{color: 'var(--danger)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        {loading ? (
+          <div style={{ padding: 16 }}><LoadingSkeleton count={5} /></div>
+        ) : data.content.length === 0 ? (
+          <div style={empty(t)}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 6 }}>
+              No students{debouncedSearch ? " match this search" : ""}
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium" style={{color: 'var(--muted)'}}>Inactive Students</p>
-              <p className="text-2xl font-bold" style={{color: 'var(--text)'}}>{stats.inactive}</p>
+            <div style={{ fontSize: 13, color: t.muted }}>
+              {debouncedSearch ? "Try a different query." : "Add the first student with the button above."}
             </div>
           </div>
-        </Card>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: t.bg }}>
+                  <Th t={t}>Student</Th>
+                  <Th t={t}>Roll</Th>
+                  <Th t={t}>Course</Th>
+                  <Th t={t}>Year</Th>
+                  <Th t={t}>Room</Th>
+                  <Th t={t}>Fees</Th>
+                  <Th t={t} style={{ textAlign: "right" }}>Actions</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.content.map((s) => {
+                  const tone = FEES_TONE[s.feesStatus] || t.muted;
+                  return (
+                    <tr key={s.id} style={{ borderTop: `1px solid ${t.border}` }}>
+                      <td style={cell}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={avatar(t)}>{initials(s.name)}</div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: t.text }}>{s.name}</div>
+                            {s.email && <div style={{ fontSize: 11, color: t.muted }}>{s.email}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ ...cell, color: t.muted }}>{s.rollNumber || "—"}</td>
+                      <td style={{ ...cell, color: t.muted }}>{s.course || "—"}{s.department ? ` (${s.department})` : ""}</td>
+                      <td style={{ ...cell, color: t.muted }}>{s.year ?? "—"}</td>
+                      <td style={{ ...cell, color: t.muted }}>{s.roomNumber || "—"}</td>
+                      <td style={cell}><span style={badge(tone)}>{s.feesStatus || "—"}</span></td>
+                      <td style={{ ...cell, textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 6 }}>
+                          <button type="button" onClick={() => openEdit(s)} disabled={busyRowId === s.id} style={tinyBtn(t, t.accent)}>Edit</button>
+                          <button type="button" onClick={() => handleDelete(s)} disabled={busyRowId === s.id} style={tinyBtn(t, "var(--danger)")}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-        <Card className="p-6 hover:shadow-md transition-all" style={{backgroundColor: 'var(--surface)', borderLeft: '4px solid var(--warning)'}}>
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg" style={{backgroundColor: `rgba(245,158,11,0.1)`}}>
-              <svg className="w-6 h-6" style={{color: 'var(--warning)'}} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium" style={{color: 'var(--muted)'}}>Rooms Occupied</p>
-              <p className="text-2xl font-bold" style={{color: 'var(--text)'}}>{stats.roomsOccupied}</p>
-            </div>
+        {!loading && data.totalPages > 1 && (
+          <div style={pager(t)}>
+            <button type="button" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} style={pageBtn(t, page === 0)}>← Prev</button>
+            <span style={{ fontSize: 12, color: t.muted }}>
+              Page <strong style={{ color: t.text }}>{page + 1}</strong> of {data.totalPages}
+            </span>
+            <button type="button" onClick={() => setPage(Math.min(data.totalPages - 1, page + 1))} disabled={page >= data.totalPages - 1} style={pageBtn(t, page >= data.totalPages - 1)}>Next →</button>
           </div>
-        </Card>
+        )}
       </div>
 
-      {/* Students Table */}
-      <Card className="overflow-hidden">
-        <StudentTable
-          students={students}
-          onEdit={handleEditStudent}
-          onDelete={handleDeleteStudent}
-          onStatusChange={handleStatusChange}
-        />
-      </Card>
+      <Modal isOpen={showForm} onClose={() => !submitting && setShowForm(false)} title={editing ? "Edit student" : "Add student"} size="md">
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="Full name" required>
+              <input type="text" required value={form.name} onChange={(e) => patch({ name: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Email" required>
+              <input type="email" required value={form.email} onChange={(e) => patch({ email: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Phone">
+              <input type="tel" value={form.phone} onChange={(e) => patch({ phone: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Roll number">
+              <input type="text" value={form.rollNumber} onChange={(e) => patch({ rollNumber: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Course">
+              <input type="text" value={form.course} onChange={(e) => patch({ course: e.target.value })} disabled={submitting} style={inputStyle(t)} placeholder="B.Tech CSE" />
+            </Field>
+            <Field label="Department">
+              <input type="text" value={form.department} onChange={(e) => patch({ department: e.target.value })} disabled={submitting} style={inputStyle(t)} placeholder="Engineering" />
+            </Field>
+            <Field label="Year">
+              <input type="number" min={1} max={6} value={form.year} onChange={(e) => patch({ year: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Room number">
+              <input type="text" value={form.roomNumber} onChange={(e) => patch({ roomNumber: e.target.value })} disabled={submitting} style={inputStyle(t)} />
+            </Field>
+            <Field label="Gender">
+              <select value={form.gender} onChange={(e) => patch({ gender: e.target.value })} disabled={submitting} style={inputStyle(t)}>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </Field>
+            <Field label="Fees status">
+              <select value={form.feesStatus} onChange={(e) => patch({ feesStatus: e.target.value })} disabled={submitting} style={inputStyle(t)}>
+                <option value="PAID">Paid</option>
+                <option value="PENDING">Pending</option>
+                <option value="OVERDUE">Overdue</option>
+              </select>
+            </Field>
+          </div>
 
-      {/* Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={editingStudent ? 'Edit Student' : 'Add New Student'}
-        size="lg"
-      >
-        <StudentForm
-          student={editingStudent}
-          onClose={handleCloseModal}
-          onSubmit={handleSubmitStudent}
-        />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: t.text, cursor: "pointer" }}>
+            <input type="checkbox" checked={form.isActive} onChange={(e) => patch({ isActive: e.target.checked })} disabled={submitting} style={{ width: 16, height: 16 }} />
+            Active
+          </label>
+
+          <div style={{ display: "flex", gap: 10, paddingTop: 6 }}>
+            <button type="button" onClick={() => setShowForm(false)} disabled={submitting} style={{ ...secondaryButton(t), flex: 1 }}>Cancel</button>
+            <button type="submit" disabled={submitting} style={{ ...primaryButton(t), flex: 1, opacity: submitting ? 0.7 : 1, cursor: submitting ? "wait" : "pointer" }}>
+              {submitting ? (editing ? "Updating…" : "Saving…") : (editing ? "Update student" : "Add student")}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
 }
+
+/* ── Styles ─────────────────────────────────────────────────────── */
+
+function Field({ label, required, children }) {
+  return (
+    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
+      {label}{required && <span style={{ color: "var(--danger)" }}> *</span>}
+      <div style={{ marginTop: 6 }}>{children}</div>
+    </label>
+  );
+}
+
+function Th({ t, children, style }) {
+  return (
+    <th style={{ textAlign: "left", textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11, fontWeight: 700, color: t.muted, padding: "12px 16px", ...style }}>
+      {children}
+    </th>
+  );
+}
+
+const headerRow = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" };
+const cell = { padding: "12px 16px", verticalAlign: "middle", color: "var(--text)" };
+const errorBanner = { margin: 16, padding: "10px 14px", borderRadius: 10, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.45)", color: "var(--danger)", fontSize: 13, display: "flex", alignItems: "center", gap: 12 };
+const linkButton = { marginLeft: "auto", background: "none", border: "none", color: "var(--danger)", fontWeight: 700, cursor: "pointer", textDecoration: "underline", fontSize: 12 };
+
+function panel(t) { return { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16 }; }
+function cardHeader(t) { return { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: `1px solid ${t.border}`, background: t.bg, borderTopLeftRadius: 16, borderTopRightRadius: 16 }; }
+function avatar(t) { return { width: 32, height: 32, borderRadius: 10, flexShrink: 0, background: `linear-gradient(135deg, ${t.accent}, ${t.purple})`, color: "#fff", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }; }
+function badge(color) { return { display: "inline-block", padding: "3px 10px", fontSize: 11, fontWeight: 700, borderRadius: 999, color, background: `${color}22`, border: `1px solid ${color}55` }; }
+function inputStyle(t) { return { width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, fontSize: 13, outline: "none" }; }
+function primaryButton(t) { return { padding: "9px 16px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${t.accent}, ${t.purple})`, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: `0 4px 14px ${t.accent}44` }; }
+function secondaryButton(t) { return { padding: "9px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, fontSize: 13, fontWeight: 600, cursor: "pointer" }; }
+function tinyBtn(t, color) { return { padding: "5px 10px", borderRadius: 8, border: `1px solid ${color}55`, background: `${color}11`, color, fontSize: 11, fontWeight: 700, cursor: "pointer" }; }
+function empty(t) { return { padding: "40px 20px", textAlign: "center", color: t.muted }; }
+function pager(t) { return { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderTop: `1px solid ${t.border}`, background: t.bg, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }; }
+function pageBtn(t, disabled) { return { padding: "6px 12px", borderRadius: 8, border: `1px solid ${t.border}`, background: disabled ? "transparent" : t.card, color: disabled ? t.muted : t.text, fontSize: 12, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }; }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <proxies>
+    <proxy>
+      <id>http-proxy</id>
+      <active>true</active>
+      <protocol>http</protocol>
+      <host>BigWeaverExecEnvMgnt-ProxyLB-4d485583b9a55f82.elb.us-east-1.amazonaws.com</host>
+      <port>3128</port>
+      <nonProxyHosts>localhost|127.0.0.1|169.254.169.254</nonProxyHosts>
+    </proxy>
+    <proxy>
+      <id>https-proxy</id>
+      <active>true</active>
+      <protocol>https</protocol>
+      <host>BigWeaverExecEnvMgnt-ProxyLB-4d485583b9a55f82.elb.us-east-1.amazonaws.com</host>
+      <port>3128</port>
+      <nonProxyHosts>localhost|127.0.0.1|169.254.169.254</nonProxyHosts>
+    </proxy>
+  </proxies>
+  <mirrors>
+    <mirror>
+      <id>maven-central-mirror</id>
+      <name>Maven Central via repo1</name>
+      <url>https://repo1.maven.org/maven2</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>

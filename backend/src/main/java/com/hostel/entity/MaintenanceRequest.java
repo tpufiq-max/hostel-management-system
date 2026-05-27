@@ -32,9 +32,10 @@ public class MaintenanceRequest {
     @Column(nullable = false)
     private Priority priority = Priority.MEDIUM;
 
+    // 'status' is a reserved keyword in H2 — renamed to request_status
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "request_status", nullable = false)
     private Status status = Status.OPEN;
 
     @Column(name = "room_number")

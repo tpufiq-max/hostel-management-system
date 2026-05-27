@@ -32,7 +32,8 @@ public class Student {
 
     private String department;
 
-    @Column(name = "year")
+    // 'year' is a reserved keyword in H2 — renamed to study_year
+    @Column(name = "study_year")
     private Integer year;
 
     @Column(name = "room_number")

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Table(name = "mess_menus",
         uniqueConstraints = @UniqueConstraint(
             name = "uk_mess_day_meal",
-            columnNames = {"day", "meal_type"}))
+            columnNames = {"week_day", "meal_type"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,8 +20,9 @@ public class MessMenu {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 'day' is a reserved keyword in H2 — renamed to week_day
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "week_day", nullable = false)
     private Day day;
 
     @Enumerated(EnumType.STRING)

@@ -41,9 +41,10 @@ public class Visitor {
     @Column(name = "check_out_time")
     private LocalDateTime checkOutTime;
 
+    // 'status' is a reserved keyword in H2 — renamed to visitor_status
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "visitor_status", nullable = false)
     private Status status = Status.CHECKED_IN;
 
     @Column(name = "approved_by")

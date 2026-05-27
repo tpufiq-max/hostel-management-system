@@ -2,3 +2,7 @@
 # Frontend build artifacts and deps
 frontend/node_modules/
 frontend/dist/
+
+# Root orchestrator deps (concurrently)
+node_modules/
+package-lock.json

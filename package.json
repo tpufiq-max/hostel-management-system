@@ -1,0 +1,22 @@
+{
+  "name": "hostel-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root orchestrator that runs the Spring Boot backend and Vite/React frontend together in dev mode.",
+  "scripts": {
+    "dev":          "concurrently -n backend,frontend -c blue,green --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend":  "cd backend  && mvn spring-boot:run",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build":        "concurrently -n backend,frontend -c blue,green \"npm run build:backend\" \"npm run build:frontend\"",
+    "build:backend":  "cd backend  && mvn package -DskipTests",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all":  "npm install && cd frontend && npm install",
+    "test:rbac":    "cd backend && python rbac_test.py"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

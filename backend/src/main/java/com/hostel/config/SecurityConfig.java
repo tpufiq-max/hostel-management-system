@@ -58,6 +58,15 @@ public class SecurityConfig {
                 // ── per-user (any authenticated role) ─────────────────────
                 .requestMatchers("/api/me/**").authenticated()
 
+                // ── Smart Mess Management (admin/warden) ──────────────────
+                // These are deeper paths than /api/mess/** (the menu CRUD)
+                // and MUST be listed before the menu rules so they win the
+                // most-specific match. If a student hits these they get 403,
+                // which the test relies on.
+                .requestMatchers("/api/mess/attendance", "/api/mess/attendance/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/mess/bills", "/api/mess/bills/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/mess/revenue", "/api/mess/revenue/**").hasAnyRole("ADMIN", "WARDEN")
+
                 // ── notices: anyone can read, only admin/warden can mutate
                 .requestMatchers(HttpMethod.GET, "/api/notices/**").authenticated()
                 .requestMatchers("/api/notices/**").hasAnyRole("ADMIN", "WARDEN")
@@ -67,6 +76,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/events/**").hasAnyRole("ADMIN", "WARDEN")
 
                 // ── mess menu: anyone can read, only admin/warden can mutate
+                // (keep these LAST among the /api/mess rules — the more specific
+                //  Smart Mess paths above must match first)
                 .requestMatchers(HttpMethod.GET, "/api/mess/**").authenticated()
                 .requestMatchers("/api/mess/**").hasAnyRole("ADMIN", "WARDEN")
 

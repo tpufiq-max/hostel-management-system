@@ -5,6 +5,8 @@ import com.hostel.dto.ComplaintDTO;
 import com.hostel.dto.MaintenanceRequestDTO;
 import com.hostel.dto.StudentDTO;
 import com.hostel.dto.UserDTO;
+import com.hostel.dto.mess.MealAttendanceDTO;
+import com.hostel.dto.mess.MonthlyBill;
 import com.hostel.entity.Student;
 import com.hostel.entity.User;
 import com.hostel.exception.BadRequestException;
@@ -15,15 +17,18 @@ import com.hostel.repository.FeeRepository;
 import com.hostel.repository.MaintenanceRequestRepository;
 import com.hostel.repository.NoticeRepository;
 import com.hostel.security.CustomUserDetails;
+import com.hostel.service.MessAttendanceService;
 import com.hostel.service.StudentService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,19 +54,22 @@ public class MeController {
     private final ComplaintRepository            complaintRepository;
     private final MaintenanceRequestRepository   maintenanceRepository;
     private final NoticeRepository               noticeRepository;
+    private final MessAttendanceService          messAttendanceService;
 
     public MeController(StudentService                 studentService,
                         FeeRepository                  feeRepository,
                         AttendanceRepository           attendanceRepository,
                         ComplaintRepository            complaintRepository,
                         MaintenanceRequestRepository   maintenanceRepository,
-                        NoticeRepository               noticeRepository) {
+                        NoticeRepository               noticeRepository,
+                        MessAttendanceService          messAttendanceService) {
         this.studentService        = studentService;
         this.feeRepository         = feeRepository;
         this.attendanceRepository  = attendanceRepository;
         this.complaintRepository   = complaintRepository;
         this.maintenanceRepository = maintenanceRepository;
         this.noticeRepository      = noticeRepository;
+        this.messAttendanceService = messAttendanceService;
     }
 
     /* ── identity ──────────────────────────────────────────────────── */
@@ -270,6 +278,42 @@ public class MeController {
         return ResponseEntity.ok(ApiResponse.success(rows));
     }
 
+    /* ── mess (smart mess management) ─────────────────────────────── */
+
+    /**
+     * Caller's own mess attendance for a calendar month.
+     * If year/month omitted, defaults to the current month.
+     */
+    @GetMapping("/mess/attendance")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<List<MealAttendanceDTO>>> myMessAttendance(
+            @AuthenticationPrincipal CustomUserDetails ud,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        Student s = requireStudent(ud);
+        YearMonth ym = resolveMonth(year, month);
+        List<MealAttendanceDTO> rows = messAttendanceService
+                .getStudentAttendance(s.getId(), ym.atDay(1), ym.atEndOfMonth());
+        return ResponseEntity.ok(ApiResponse.success(rows));
+    }
+
+    /**
+     * Caller's own mess bill for a calendar month.
+     * If year/month omitted, defaults to the current month.
+     */
+    @GetMapping("/mess/bill")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<MonthlyBill>> myMessBill(
+            @AuthenticationPrincipal CustomUserDetails ud,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        Student s = requireStudent(ud);
+        YearMonth ym = resolveMonth(year, month);
+        MonthlyBill bill = messAttendanceService
+                .calculateMonthlyBill(s.getId(), ym.getYear(), ym.getMonthValue());
+        return ResponseEntity.ok(ApiResponse.success(bill));
+    }
+
     /* ── per-student dashboard ─────────────────────────────────────── */
 
     @GetMapping("/dashboard")
@@ -348,6 +392,14 @@ public class MeController {
     private static String notBlank(String s, String message) {
         if (s == null || s.isBlank()) throw new BadRequestException(message);
         return s;
+    }
+
+    private static YearMonth resolveMonth(Integer year, Integer month) {
+        YearMonth now = YearMonth.now();
+        int y = year  != null ? year  : now.getYear();
+        int m = month != null ? month : now.getMonthValue();
+        if (m < 1 || m > 12) throw new BadRequestException("month must be 1..12");
+        return YearMonth.of(y, m);
     }
 
     private StudentDTO toDTO(Student s) {

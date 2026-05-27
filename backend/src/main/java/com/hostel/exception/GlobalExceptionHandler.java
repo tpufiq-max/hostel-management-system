@@ -33,6 +33,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Invalid email or password"));
     }
 
+    @ExceptionHandler(com.hostel.security.LoginRateLimiter.TooManyAttemptsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyAttempts(
+            com.hostel.security.LoginRateLimiter.TooManyAttemptsException ex) {
+        long minutes = Math.max(1, (ex.getRetryAfterSeconds() + 59) / 60);
+        String msg = "Too many login attempts. Try again in " + minutes
+                   + (minutes == 1 ? " minute." : " minutes.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(ApiResponse.error(msg));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();

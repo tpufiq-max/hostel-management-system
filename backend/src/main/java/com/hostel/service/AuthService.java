@@ -7,8 +7,13 @@ import com.hostel.exception.ResourceNotFoundException;
 import com.hostel.repository.UserRepository;
 import com.hostel.security.CustomUserDetails;
 import com.hostel.security.JwtTokenProvider;
+import com.hostel.security.LoginRateLimiter;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,36 +28,61 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final LoginRateLimiter rateLimiter;
 
     public AuthService(AuthenticationManager authenticationManager,
                        UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider tokenProvider) {
+                       JwtTokenProvider tokenProvider,
+                       LoginRateLimiter rateLimiter) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.rateLimiter = rateLimiter;
     }
 
     public AuthResponse login(AuthRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        // Look up by lower-cased email so MIxedCase@Hostel.com isn't a
+        // separate bucket from mixedcase@hostel.com.
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        rateLimiter.checkAllowed(email);
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
+            );
 
-        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        User user = userDetails.getUser();
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String accessToken = tokenProvider.generateAccessToken(authentication);
-        String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+            User user = userDetails.getUser();
 
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .user(mapToUserDTO(user))
-                .build();
+            String accessToken = tokenProvider.generateAccessToken(authentication);
+            String refreshToken = tokenProvider.generateRefreshToken(user.getEmail());
+
+            // Successful login wipes the failure bucket for this email.
+            rateLimiter.reset(email);
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .user(mapToUserDTO(user))
+                    .build();
+        } catch (DisabledException ex) {
+            // Don't count deactivated accounts towards the rate limit —
+            // the user can't fix that themselves.
+            throw new BadRequestException("Your account has been deactivated. Please contact the administrator.");
+        } catch (LockedException ex) {
+            throw new BadRequestException("Your account is locked. Please contact the administrator.");
+        } catch (BadCredentialsException ex) {
+            rateLimiter.recordFailure(email);
+            throw new BadRequestException("Invalid email or password.");
+        } catch (AuthenticationException ex) {
+            rateLimiter.recordFailure(email);
+            throw new BadRequestException("Invalid email or password.");
+        }
     }
 
     public AuthResponse register(RegisterRequest request) {

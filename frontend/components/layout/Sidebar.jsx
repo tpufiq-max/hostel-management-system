@@ -29,6 +29,7 @@ const menuItems = [
   { name: "Financial",       path: "/financial",    icon: "💰", section: "finance",  roles: ADMIN },
 
   { name: "Attendance",      path: "/attendance",   icon: "📅", section: "academic", roles: STAFF },
+  { name: "Mess Attendance", path: "/mess/attendance", icon: "🍽️", section: "academic", roles: STAFF },
   { name: "Complaints",      path: "/complaint",    icon: "🔔", section: "academic", roles: STAFF },
   { name: "Maintenance",     path: "/maintenance",  icon: "🔧", section: "academic", roles: STAFF },
   { name: "Visitors",        path: "/visitor",      icon: "👤", section: "academic", roles: STAFF },
@@ -44,6 +45,7 @@ const menuItems = [
   { name: "My Room",         path: "/me/room",        icon: "🚪", section: "me",        roles: ["student"] },
   { name: "My Fees",         path: "/me/fees",        icon: "₹",  section: "me",        roles: ["student"] },
   { name: "My Attendance",   path: "/me/attendance",  icon: "📅", section: "me",        roles: ["student"] },
+  { name: "My Mess",         path: "/me/mess",        icon: "🍽️", section: "me",        roles: ["student"] },
   { name: "My Complaints",   path: "/me/complaints",  icon: "🔔", section: "me",        roles: ["student"] },
   { name: "My Maintenance",  path: "/me/maintenance", icon: "🔧", section: "me",        roles: ["student"] },
   { name: "Notices",         path: "/me/notices",     icon: "📢", section: "me",        roles: ["student"] },

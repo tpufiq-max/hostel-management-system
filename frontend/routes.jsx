@@ -17,6 +17,7 @@ import Students from './pages/Students';
 import Rooms from './pages/Rooms';
 import Allocation from './pages/Allocation';
 import Mess from './pages/Mess';
+import MessAttendance from './pages/MessAttendance';
 import Fees from './pages/Fees';
 import Complaint from './pages/Complaint';
 import Attendance from './pages/Attendance';
@@ -34,6 +35,7 @@ import MyProfile     from './pages/student/MyProfile';
 import MyRoom        from './pages/student/MyRoom';
 import MyFees        from './pages/student/MyFees';
 import MyAttendance  from './pages/student/MyAttendance';
+import MyMess        from './pages/student/MyMess';
 import MyComplaints  from './pages/student/MyComplaints';
 import MyMaintenance from './pages/student/MyMaintenance';
 import MyNotices     from './pages/student/MyNotices';
@@ -86,6 +88,7 @@ function AppRoutes() {
             <Route path='/rooms'            element={<ProtectedRoute allowedRoles={STAFF}><Rooms /></ProtectedRoute>} />
             <Route path='/allocation'       element={<ProtectedRoute allowedRoles={STAFF}><Allocation /></ProtectedRoute>} />
             <Route path='/mess'             element={<ProtectedRoute allowedRoles={STAFF}><Mess /></ProtectedRoute>} />
+            <Route path='/mess/attendance'  element={<ProtectedRoute allowedRoles={STAFF}><MessAttendance /></ProtectedRoute>} />
             <Route path='/fees'             element={<ProtectedRoute allowedRoles={STAFF}><Fees /></ProtectedRoute>} />
             <Route path='/complaint'        element={<ProtectedRoute allowedRoles={STAFF}><Complaint /></ProtectedRoute>} />
             <Route path='/attendance'       element={<ProtectedRoute allowedRoles={STAFF}><Attendance /></ProtectedRoute>} />
@@ -105,6 +108,7 @@ function AppRoutes() {
             <Route path='/me/room'        element={<ProtectedRoute allowedRoles={['student']}><MyRoom /></ProtectedRoute>} />
             <Route path='/me/fees'        element={<ProtectedRoute allowedRoles={['student']}><MyFees /></ProtectedRoute>} />
             <Route path='/me/attendance'  element={<ProtectedRoute allowedRoles={['student']}><MyAttendance /></ProtectedRoute>} />
+            <Route path='/me/mess'        element={<ProtectedRoute allowedRoles={['student']}><MyMess /></ProtectedRoute>} />
             <Route path='/me/complaints'  element={<ProtectedRoute allowedRoles={['student']}><MyComplaints /></ProtectedRoute>} />
             <Route path='/me/maintenance' element={<ProtectedRoute allowedRoles={['student']}><MyMaintenance /></ProtectedRoute>} />
             <Route path='/me/notices'     element={<ProtectedRoute allowedRoles={['student']}><MyNotices /></ProtectedRoute>} />

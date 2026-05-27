@@ -14,19 +14,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Objects;
 
 /**
- * DataInitializer — bootstraps demo accounts on first startup.
+ * DataInitializer — bootstraps the initial admin only.
  *
- *   • Admin   : admin@hostel.com / admin123     (role = ADMIN)
- *   • Student : student@hostel.com / student123 (role = STUDENT)
+ * Per security policy, students must be registered by the admin.
+ * Creating a Student via POST /api/students automatically also creates
+ * the linked login (User entity), so admin-created students can sign in
+ * with their email and roll number as the password (changeable in
+ * Settings → Change password).
  *
- * No other sample data is seeded — rooms, fees, complaints, visitors,
- * notices, events, mess menus, maintenance requests, attendance records
- * all start empty. Add data through the UI.
+ * No demo student is auto-seeded.  If you want a quick demo student for
+ * development, set:
+ *   APP_BOOTSTRAP_STUDENT_ENABLED=true
  *
- * Bootstrap is idempotent — skipped if the username already exists.
- * Disable once your real accounts are configured:
- *   APP_BOOTSTRAP_ADMIN_ENABLED=false
- *   APP_BOOTSTRAP_STUDENT_ENABLED=false
+ * Admin bootstrap is idempotent — skipped if the username already exists.
  */
 @Configuration
 public class DataInitializer {
@@ -36,26 +36,26 @@ public class DataInitializer {
     @Bean
     @Order(1)
     CommandLineRunner initData(
-            // ── admin ──────────────────────────────────────────────────────
+            // ── admin (always seeded by default) ───────────────────────
             @Value("${app.bootstrap.admin.enabled:true}")             boolean adminEnabled,
-            @Value("${app.bootstrap.admin.name:Administrator}")       String adminName,
-            @Value("${app.bootstrap.admin.username:admin}")           String adminUsername,
-            @Value("${app.bootstrap.admin.email:admin@hostel.com}")   String adminEmail,
-            @Value("${app.bootstrap.admin.password:admin123}")        String adminPassword,
-            @Value("${app.bootstrap.admin.phone:9876543210}")         String adminPhone,
-            // ── demo student ───────────────────────────────────────────────
-            @Value("${app.bootstrap.student.enabled:true}")           boolean studentEnabled,
-            @Value("${app.bootstrap.student.name:Demo Student}")      String studentName,
-            @Value("${app.bootstrap.student.username:student}")       String studentUsername,
-            @Value("${app.bootstrap.student.email:student@hostel.com}") String studentEmail,
-            @Value("${app.bootstrap.student.password:student123}")    String studentPassword,
-            @Value("${app.bootstrap.student.phone:9876500000}")       String studentPhone,
+            @Value("${app.bootstrap.admin.name:Administrator}")       String  adminName,
+            @Value("${app.bootstrap.admin.username:admin}")           String  adminUsername,
+            @Value("${app.bootstrap.admin.email:admin@hostel.com}")   String  adminEmail,
+            @Value("${app.bootstrap.admin.password:admin123}")        String  adminPassword,
+            @Value("${app.bootstrap.admin.phone:9876543210}")         String  adminPhone,
+            // ── demo student (OFF by default — students come from admin) ─
+            @Value("${app.bootstrap.student.enabled:false}")            boolean studentEnabled,
+            @Value("${app.bootstrap.student.name:Demo Student}")        String  studentName,
+            @Value("${app.bootstrap.student.username:student}")         String  studentUsername,
+            @Value("${app.bootstrap.student.email:student@hostel.com}") String  studentEmail,
+            @Value("${app.bootstrap.student.password:student123}")      String  studentPassword,
+            @Value("${app.bootstrap.student.phone:9876500000}")         String  studentPhone,
             UserRepository  userRepository,
             PasswordEncoder passwordEncoder) {
 
         return args -> {
             try {
-                // ── admin ─────────────────────────────────────────────────
+                // ── admin ─────────────────────────────────────────────
                 if (!adminEnabled) {
                     log.info("DataInitializer: admin bootstrap disabled — skipping");
                 } else if (userRepository.existsByUsername(adminUsername)) {
@@ -73,9 +73,9 @@ public class DataInitializer {
                     log.info("DataInitializer: ✓ admin '{}' created", adminUsername);
                 }
 
-                // ── demo student ──────────────────────────────────────────
+                // ── demo student (off by default) ─────────────────────
                 if (!studentEnabled) {
-                    log.info("DataInitializer: student bootstrap disabled — skipping");
+                    log.info("DataInitializer: demo student bootstrap disabled (default) — students must be created via the admin UI");
                 } else if (userRepository.existsByUsername(studentUsername)) {
                     log.info("DataInitializer: student '{}' already exists — skipping", studentUsername);
                 } else {
@@ -88,14 +88,14 @@ public class DataInitializer {
                             .phone(studentPhone)
                             .isActive(true)
                             .build()));
-                    log.info("DataInitializer: ✓ student '{}' created", studentUsername);
+                    log.info("DataInitializer: ✓ demo student '{}' created", studentUsername);
                 }
 
                 log.info("==========================================");
                 log.info("🏠 HMS Backend Ready — http://localhost:8080");
-                log.info("   Admin   : {} / {}", adminEmail,   adminPassword);
-                log.info("   Student : {} / {}", studentEmail, studentPassword);
-                log.info("   Note    : DB is empty — add data via the UI");
+                log.info("   Admin login : {} / {}", adminEmail, adminPassword);
+                log.info("   Students    : created by admin via the UI;");
+                log.info("                 default login password = roll number (lower-case)");
                 log.info("==========================================");
 
             } catch (Exception e) {

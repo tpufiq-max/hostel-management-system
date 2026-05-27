@@ -3,8 +3,16 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthContext } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Layout from './components/layout/Layout';
-import Dashboard from './pages/Dashboard';
+
+// shared
 import Login from './pages/Login';
+import RoleDashboard from './pages/RoleDashboard';
+import NotFound from './pages/NotFound.jsx';
+import Profile from './pages/Profile';
+import SettingsPage from './pages/Settings';
+import Help from './pages/Help';
+
+// admin / warden
 import Students from './pages/Students';
 import Rooms from './pages/Rooms';
 import Allocation from './pages/Allocation';
@@ -15,44 +23,43 @@ import Attendance from './pages/Attendance';
 import Visitor from './pages/Visitor';
 import Notice from './pages/Notice';
 import Reports from './pages/Reports';
-import NotFound from './pages/NotFound.jsx';
 import Analytics from './pages/Analytics';
 import StudentProfiles from './pages/StudentProfiles';
 import Maintenance from './pages/Maintenance';
 import EventCalendar from './pages/EventCalendar';
 import FinancialDashboard from './pages/FinancialDashboard';
-import Profile from './pages/Profile';
-import SettingsPage from './pages/Settings';
-import Help from './pages/Help';
+
+// student
+import MyProfile     from './pages/student/MyProfile';
+import MyRoom        from './pages/student/MyRoom';
+import MyFees        from './pages/student/MyFees';
+import MyAttendance  from './pages/student/MyAttendance';
+import MyComplaints  from './pages/student/MyComplaints';
+import MyMaintenance from './pages/student/MyMaintenance';
+import MyNotices     from './pages/student/MyNotices';
+
+const STAFF = ['admin', 'warden'];
+const ADMIN = ['admin'];
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          gap: 16,
-          background: "var(--bg)",
-          color: "var(--muted)",
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            border: "3px solid var(--border)",
-            borderTop: "3px solid var(--accent)",
-            borderRadius: "50%",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
+      <div style={{
+        minHeight: "100vh",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexDirection: "column", gap: 16,
+        background: "var(--bg)", color: "var(--muted)",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+        <div style={{
+          width: 44, height: 44,
+          border: "3px solid var(--border)",
+          borderTop: "3px solid var(--accent)",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }} />
         <div style={{ fontSize: 13 }}>Loading…</div>
       </div>
     );
@@ -68,25 +75,40 @@ function AppRoutes() {
       ) : (
         <Layout>
           <Routes>
-            <Route path='/' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path='/students' element={<ProtectedRoute allowedRoles={['admin']}><Students /></ProtectedRoute>} />
-            <Route path='/rooms' element={<ProtectedRoute allowedRoles={['admin']}><Rooms /></ProtectedRoute>} />
-            <Route path='/allocation' element={<ProtectedRoute allowedRoles={['admin']}><Allocation /></ProtectedRoute>} />
-            <Route path='/mess' element={<ProtectedRoute allowedRoles={['admin']}><Mess /></ProtectedRoute>} />
-            <Route path='/fees' element={<ProtectedRoute allowedRoles={['admin']}><Fees /></ProtectedRoute>} />
-            <Route path='/complaint' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Complaint /></ProtectedRoute>} />
-            <Route path='/attendance' element={<ProtectedRoute allowedRoles={['admin']}><Attendance /></ProtectedRoute>} />
-            <Route path='/visitor' element={<ProtectedRoute allowedRoles={['admin']}><Visitor /></ProtectedRoute>} />
-            <Route path='/notice' element={<ProtectedRoute allowedRoles={['admin']}><Notice /></ProtectedRoute>} />
-            <Route path='/reports' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Reports /></ProtectedRoute>} />
-            <Route path='/analytics' element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
-            <Route path='/student-profiles' element={<ProtectedRoute allowedRoles={['admin']}><StudentProfiles /></ProtectedRoute>} />
-            <Route path='/maintenance' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Maintenance /></ProtectedRoute>} />
-            <Route path='/events' element={<ProtectedRoute allowedRoles={['admin', 'student']}><EventCalendar /></ProtectedRoute>} />
-            <Route path='/financial' element={<ProtectedRoute allowedRoles={['admin']}><FinancialDashboard /></ProtectedRoute>} />
-            <Route path='/profile' element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            {/* ── shared / role-aware ────────────────────────────────── */}
+            <Route path='/'         element={<ProtectedRoute><RoleDashboard /></ProtectedRoute>} />
+            <Route path='/profile'  element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path='/settings' element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path='/help' element={<ProtectedRoute><Help /></ProtectedRoute>} />
+            <Route path='/help'     element={<ProtectedRoute><Help /></ProtectedRoute>} />
+
+            {/* ── admin / warden ─────────────────────────────────────── */}
+            <Route path='/students'         element={<ProtectedRoute allowedRoles={STAFF}><Students /></ProtectedRoute>} />
+            <Route path='/rooms'            element={<ProtectedRoute allowedRoles={STAFF}><Rooms /></ProtectedRoute>} />
+            <Route path='/allocation'       element={<ProtectedRoute allowedRoles={STAFF}><Allocation /></ProtectedRoute>} />
+            <Route path='/mess'             element={<ProtectedRoute allowedRoles={STAFF}><Mess /></ProtectedRoute>} />
+            <Route path='/fees'             element={<ProtectedRoute allowedRoles={STAFF}><Fees /></ProtectedRoute>} />
+            <Route path='/complaint'        element={<ProtectedRoute allowedRoles={STAFF}><Complaint /></ProtectedRoute>} />
+            <Route path='/attendance'       element={<ProtectedRoute allowedRoles={STAFF}><Attendance /></ProtectedRoute>} />
+            <Route path='/visitor'          element={<ProtectedRoute allowedRoles={STAFF}><Visitor /></ProtectedRoute>} />
+            <Route path='/notice'           element={<ProtectedRoute allowedRoles={STAFF}><Notice /></ProtectedRoute>} />
+            <Route path='/reports'          element={<ProtectedRoute allowedRoles={STAFF}><Reports /></ProtectedRoute>} />
+            <Route path='/student-profiles' element={<ProtectedRoute allowedRoles={STAFF}><StudentProfiles /></ProtectedRoute>} />
+            <Route path='/maintenance'      element={<ProtectedRoute allowedRoles={STAFF}><Maintenance /></ProtectedRoute>} />
+            <Route path='/events'           element={<ProtectedRoute allowedRoles={STAFF}><EventCalendar /></ProtectedRoute>} />
+
+            {/* ── admin only ─────────────────────────────────────────── */}
+            <Route path='/analytics' element={<ProtectedRoute allowedRoles={ADMIN}><Analytics /></ProtectedRoute>} />
+            <Route path='/financial' element={<ProtectedRoute allowedRoles={ADMIN}><FinancialDashboard /></ProtectedRoute>} />
+
+            {/* ── student-only (also accessible to admin/warden) ─────── */}
+            <Route path='/me/profile'     element={<ProtectedRoute allowedRoles={['student']}><MyProfile /></ProtectedRoute>} />
+            <Route path='/me/room'        element={<ProtectedRoute allowedRoles={['student']}><MyRoom /></ProtectedRoute>} />
+            <Route path='/me/fees'        element={<ProtectedRoute allowedRoles={['student']}><MyFees /></ProtectedRoute>} />
+            <Route path='/me/attendance'  element={<ProtectedRoute allowedRoles={['student']}><MyAttendance /></ProtectedRoute>} />
+            <Route path='/me/complaints'  element={<ProtectedRoute allowedRoles={['student']}><MyComplaints /></ProtectedRoute>} />
+            <Route path='/me/maintenance' element={<ProtectedRoute allowedRoles={['student']}><MyMaintenance /></ProtectedRoute>} />
+            <Route path='/me/notices'     element={<ProtectedRoute allowedRoles={['student']}><MyNotices /></ProtectedRoute>} />
+
             <Route path='*' element={<NotFound />} />
           </Routes>
         </Layout>

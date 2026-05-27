@@ -3,6 +3,7 @@ package com.hostel.config;
 import com.hostel.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -15,6 +16,18 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+/**
+ * Security configuration with strict role-based access.
+ *
+ * Roles
+ *   ADMIN   — full access
+ *   WARDEN  — admin-equivalent for student / room / fee operations
+ *   STUDENT — only the per-user /api/me/** endpoints + read-only notices/events
+ *
+ * The matchers below are ordered most-specific first.
+ * Anything not explicitly listed falls through to .anyRequest().authenticated()
+ * which still requires a valid JWT.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -34,22 +47,52 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // ── public ────────────────────────────────────────────────
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/error").permitAll()
+
+                // ── per-user (any authenticated role) ─────────────────────
+                .requestMatchers("/api/me/**").authenticated()
+
+                // ── notices: anyone can read, only admin/warden can mutate
+                .requestMatchers(HttpMethod.GET, "/api/notices/**").authenticated()
+                .requestMatchers("/api/notices/**").hasAnyRole("ADMIN", "WARDEN")
+
+                // ── events: anyone can read, only admin/warden can mutate
+                .requestMatchers(HttpMethod.GET, "/api/events/**").authenticated()
+                .requestMatchers("/api/events/**").hasAnyRole("ADMIN", "WARDEN")
+
+                // ── mess menu: anyone can read, only admin/warden can mutate
+                .requestMatchers(HttpMethod.GET, "/api/mess/**").authenticated()
+                .requestMatchers("/api/mess/**").hasAnyRole("ADMIN", "WARDEN")
+
+                // ── admin-only domains ────────────────────────────────────
+                .requestMatchers("/api/students/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/rooms/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/allocations/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/fees/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/attendance/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/visitors/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/analytics/**").hasRole("ADMIN")
+                .requestMatchers("/api/dashboard/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "WARDEN")
+
+                // ── shared (admin sees all, students use /api/me) ─────────
+                // GET listings on these are admin-only; submission goes through /api/me
+                .requestMatchers("/api/complaints/**").hasAnyRole("ADMIN", "WARDEN")
+                .requestMatchers("/api/maintenance/**").hasAnyRole("ADMIN", "WARDEN")
+
+                // ── default: must be authenticated ────────────────────────
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(
-                jwtAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class
-            );
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // Allow H2 console iframe
-        http.headers(headers ->
-            headers.frameOptions(frame -> frame.disable()));
+        // Allow H2 console iframe (dev only)
+        http.headers(h -> h.frameOptions(frame -> frame.disable()));
 
         return http.build();
     }
@@ -60,8 +103,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 }

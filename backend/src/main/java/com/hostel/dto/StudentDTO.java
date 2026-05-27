@@ -39,4 +39,11 @@ public class StudentDTO {
     private boolean isActive;
     private String admissionDate;
     private String createdAt;
+
+    /**
+     * One-shot temporary password set when admin creates a student.
+     * Populated only in the response of POST /api/students; never stored.
+     * The student should change this on first login via Settings.
+     */
+    private String tempPassword;
 }

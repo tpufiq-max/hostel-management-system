@@ -1,4 +1,5 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { ThemeContext } from "../context/ThemeContext";
 import { AuthContext } from "../context/AuthContext";
 import { post } from "../api/api";
@@ -32,12 +33,17 @@ function loadPrefs() {
 
 export default function Settings() {
   const { t, isDark, toggleTheme } = useContext(ThemeContext);
-  const { user } = useContext(AuthContext);
+  const { user, logout }           = useContext(AuthContext);
+  const navigate                   = useNavigate();
 
   // ── change-password form state ───────────────────────────────────────
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg]   = useState(null); // { kind, text }
+  const [pwDone, setPwDone] = useState(false); // stays true after a successful change
+
+  // simple client-side strength meter (0-4)
+  const pwStrength = useMemo(() => scorePassword(pw.newPassword), [pw.newPassword]);
 
   // ── prefs state (localStorage) ───────────────────────────────────────
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -75,9 +81,13 @@ export default function Settings() {
     setPwBusy(true);
     try {
       await post("/auth/change-password", { currentPassword, newPassword });
-      setPwMsg({ kind: "success", text: "Password changed successfully." });
+      setPwMsg({ kind: "success", text: "Password changed. You'll need it the next time you sign in." });
+      setPwDone(true);
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
+      // Backend returns helpful messages like "Current password is incorrect"
+      // or "New password must be different from current password". Surface them
+      // verbatim — the api/api.js interceptor already normalises into err.message.
       setPwMsg({
         kind: "danger",
         text: err?.message || "Couldn't change password. Please try again.",
@@ -85,6 +95,11 @@ export default function Settings() {
     } finally {
       setPwBusy(false);
     }
+  }
+
+  function handleSignOut() {
+    logout?.();
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -174,25 +189,31 @@ export default function Settings() {
                    type="password"
                    autoComplete="current-password"
                    value={pw.currentPassword}
-                   onChange={v => setPw(p => ({ ...p, currentPassword: v }))} />
+                   onChange={v => { setPw(p => ({ ...p, currentPassword: v })); if (pwDone) setPwDone(false); }} />
 
-            <Input t={t}
-                   label="New password"
-                   type="password"
-                   autoComplete="new-password"
-                   hint="Minimum 6 characters."
-                   value={pw.newPassword}
-                   onChange={v => setPw(p => ({ ...p, newPassword: v }))} />
+            <div>
+              <Input t={t}
+                     label="New password"
+                     type="password"
+                     autoComplete="new-password"
+                     hint="Minimum 6 characters."
+                     value={pw.newPassword}
+                     onChange={v => { setPw(p => ({ ...p, newPassword: v })); if (pwDone) setPwDone(false); }} />
+              {pw.newPassword.length > 0 && (
+                <PasswordStrength t={t} score={pwStrength} />
+              )}
+            </div>
 
             <Input t={t}
                    label="Confirm new password"
                    type="password"
                    autoComplete="new-password"
                    value={pw.confirmPassword}
-                   onChange={v => setPw(p => ({ ...p, confirmPassword: v }))} />
+                   onChange={v => { setPw(p => ({ ...p, confirmPassword: v })); if (pwDone) setPwDone(false); }} />
 
             <div style={{
-              display: "flex", alignItems: "flex-end", gap: 10,
+              display: "flex", alignItems: "center", gap: 10,
+              flexWrap: "wrap",
               gridColumn: "1 / -1", marginTop: 4,
             }}>
               <button
@@ -212,6 +233,26 @@ export default function Settings() {
               >
                 {pwBusy ? "Saving…" : "Update password"}
               </button>
+
+              {pwDone && (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  style={{
+                    padding: "10px 18px",
+                    borderRadius: 10,
+                    border: `1px solid ${t.border}`,
+                    background: t.card,
+                    color: t.text,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Sign out and re-login
+                </button>
+              )}
+
               <span style={{ fontSize: 12, color: t.muted }}>
                 Signed in as <b style={{ color: t.text }}>{user?.email ?? "—"}</b>
               </span>
@@ -339,7 +380,7 @@ function Input({ t, label, value, onChange, type = "text", autoComplete, hint })
 function Alert({ t, kind, children }) {
   const color = kind === "danger" ? t.danger : kind === "success" ? t.success : t.accent;
   return (
-    <div style={{
+    <div role="alert" style={{
       padding: "10px 14px",
       borderRadius: 12,
       background: `${color}18`,
@@ -348,6 +389,45 @@ function Alert({ t, kind, children }) {
       fontSize: 13,
     }}>
       {children}
+    </div>
+  );
+}
+
+/* ── password strength helpers ──────────────────────────────────────────
+ * Cheap scoring: length tier + variety of character classes used. Mirrors
+ * what the user could realistically reason about, not a real entropy
+ * estimate. The number maps to a label and a colour-coded bar.
+ * ───────────────────────────────────────────────────────────────────── */
+
+function scorePassword(pw) {
+  if (!pw) return 0;
+  let score = 0;
+  if (pw.length >= 6)  score++;
+  if (pw.length >= 10) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw))   score++;
+  if (/[^a-zA-Z0-9]/.test(pw)) score++;
+  return Math.min(score, 4);
+}
+
+function PasswordStrength({ t, score }) {
+  const labels = ["Too short", "Weak", "Fair", "Good", "Strong"];
+  const colors = [t.danger, t.danger, t.warning, t.accent, t.success];
+  const label  = labels[score];
+  const color  = colors[score];
+  const filled = Math.max(1, score);
+  return (
+    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", gap: 3 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{
+            flex: 1, height: 4, borderRadius: 2,
+            background: i < filled ? color : t.border,
+            transition: "background 0.2s",
+          }} />
+        ))}
+      </div>
+      <span style={{ fontSize: 11, color }}>{label}</span>
     </div>
   );
 }

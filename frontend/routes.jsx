@@ -21,6 +21,9 @@ import StudentProfiles from './pages/StudentProfiles';
 import Maintenance from './pages/Maintenance';
 import EventCalendar from './pages/EventCalendar';
 import FinancialDashboard from './pages/FinancialDashboard';
+import Profile from './pages/Profile';
+import SettingsPage from './pages/Settings';
+import Help from './pages/Help';
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useContext(AuthContext);
@@ -81,6 +84,9 @@ function AppRoutes() {
             <Route path='/maintenance' element={<ProtectedRoute allowedRoles={['admin', 'student']}><Maintenance /></ProtectedRoute>} />
             <Route path='/events' element={<ProtectedRoute allowedRoles={['admin', 'student']}><EventCalendar /></ProtectedRoute>} />
             <Route path='/financial' element={<ProtectedRoute allowedRoles={['admin']}><FinancialDashboard /></ProtectedRoute>} />
+            <Route path='/profile' element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path='/settings' element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+            <Route path='/help' element={<ProtectedRoute><Help /></ProtectedRoute>} />
             <Route path='*' element={<NotFound />} />
           </Routes>
         </Layout>

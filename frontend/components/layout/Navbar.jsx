@@ -1,10 +1,12 @@
 import React, { useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ThemeContext } from "../../context/ThemeContext";
 import { AuthContext } from "../../context/AuthContext";
 
 export default function Navbar({ sidebarOpen, setSidebarOpen, isMobile, t: tProp, isDark: isDarkProp }) {
   const themeCtx = useContext(ThemeContext);
   const authCtx  = useContext(AuthContext);
+  const navigate = useNavigate();
 
   // Support both prop-passed t (from Layout) and direct context
   const t      = tProp      ?? themeCtx?.t;
@@ -298,10 +300,10 @@ export default function Navbar({ sidebarOpen, setSidebarOpen, isMobile, t: tProp
 
                 {/* Menu items */}
                 {[
-                  { icon: "👤", label: "My Profile",    action: () => {} },
-                  { icon: "⚙️", label: "Settings",      action: () => {} },
+                  { icon: "👤", label: "My Profile",    action: () => navigate("/profile") },
+                  { icon: "⚙️", label: "Settings",      action: () => navigate("/settings") },
                   { icon: "🔔", label: "Notifications", action: () => { setShowUserMenu(false); setShowNotifs(true); } },
-                  { icon: "❓", label: "Help & Support", action: () => {} },
+                  { icon: "❓", label: "Help & Support", action: () => navigate("/help") },
                 ].map(item => (
                   <div key={item.label} className="hms-dd-item" style={{
                     padding: "11px 16px", display: "flex", alignItems: "center",

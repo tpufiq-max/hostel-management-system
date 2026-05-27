@@ -34,3 +34,9 @@ build/
 
 ### Mac ###
 .DS_Store
+
+
+### H2 file-based dev database ###
+data/
+*.mv.db
+*.trace.db

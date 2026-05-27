@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "attendance", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"student_id", "date"})
+    @UniqueConstraint(columnNames = {"student_id", "attendance_date"})
 })
 @Data
 @NoArgsConstructor
@@ -23,7 +23,7 @@ public class Attendance {
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
-    @Column(nullable = false)
+    @Column(name = "attendance_date", nullable = false)
     private LocalDate date;
 
     @Enumerated(EnumType.STRING)

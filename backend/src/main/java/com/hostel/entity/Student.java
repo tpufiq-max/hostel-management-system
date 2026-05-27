@@ -32,6 +32,7 @@ public class Student {
 
     private String department;
 
+    @Column(name = "year")
     private Integer year;
 
     @Column(name = "room_number")

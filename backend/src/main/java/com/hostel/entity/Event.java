@@ -44,7 +44,7 @@ public class Event {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "event_status", nullable = false)
     private Status status = Status.UPCOMING;
 
     @Column(name = "max_participants")
